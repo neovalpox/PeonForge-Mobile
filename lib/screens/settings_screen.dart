@@ -5,8 +5,15 @@ import '../theme/wc3_theme.dart';
 import '../widgets/gold_card.dart';
 import 'characters_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  double? _localVolume; // local slider state to avoid rebuild lag
 
   @override
   Widget build(BuildContext context) {
@@ -86,14 +93,15 @@ class SettingsScreen extends StatelessWidget {
                 const Icon(Icons.volume_down, color: WC3Colors.textMid, size: 20),
                 Expanded(
                   child: Slider(
-                    value: p.config.volume,
+                    value: _localVolume ?? p.config.volume,
                     min: 0, max: 1,
-                    onChanged: (v) => p.setVolume(v),
+                    onChanged: (v) => setState(() => _localVolume = v),
+                    onChangeEnd: (v) { p.setVolume(v); setState(() => _localVolume = null); },
                   ),
                 ),
                 SizedBox(
                   width: 36,
-                  child: Text('${(p.config.volume * 100).round()}%', style: const TextStyle(color: WC3Colors.textMid, fontSize: 12)),
+                  child: Text('${((_localVolume ?? p.config.volume) * 100).round()}%', style: const TextStyle(color: WC3Colors.textMid, fontSize: 12)),
                 ),
               ],
             ),
