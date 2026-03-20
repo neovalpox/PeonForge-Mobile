@@ -138,21 +138,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _onTaskComplete(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
-    final isOrc = provider.config.side == 'horde';
 
     final charId = event.characterId;
     debugPrint('[PeonForge] Notification: charId=$charId project=${event.project}');
-    AndroidBitmap<Object>? largeIcon;
+
+    // Resolve character — use event's character, fallback to avatar, fallback to faction
+    GameCharacter? char;
     if (charId != null && charId.isNotEmpty) {
-      largeIcon = await _getCharacterIcon(charId);
+      char = provider.characters.where((c) => c.id == charId).firstOrNull;
+    }
+    char ??= provider.avatar.isNotEmpty
+        ? provider.characters.where((c) => c.id == provider.avatar).firstOrNull
+        : null;
+    final isOrc = char != null ? char.side == 'horde' : provider.config.side == 'horde';
+
+    AndroidBitmap<Object>? largeIcon;
+    final iconId = char?.id ?? charId;
+    if (iconId != null && iconId.isNotEmpty) {
+      largeIcon = await _getCharacterIcon(iconId);
     }
 
-    // Find character name for the title
     String title = isOrc ? 'Zug zug !' : 'Travail termine !';
-    if (charId != null) {
-      final char = provider.characters.where((c) => c.id == charId).firstOrNull;
-      if (char != null) title = '${char.name} : Travail termine !';
-    }
+    if (char != null) title = '${char.name} : Travail termine !';
 
     _notifs.show(
       event.timestamp ~/ 1000,
@@ -174,19 +181,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _onPermissionRequest(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
-    final isOrc = provider.config.faction == 'orc';
 
     final charId = event.characterId;
-    AndroidBitmap<Object>? largeIcon;
+    GameCharacter? char;
     if (charId != null && charId.isNotEmpty) {
-      largeIcon = await _getCharacterIcon(charId);
+      char = provider.characters.where((c) => c.id == charId).firstOrNull;
+    }
+    char ??= provider.avatar.isNotEmpty
+        ? provider.characters.where((c) => c.id == provider.avatar).firstOrNull
+        : null;
+    final isOrc = char != null ? char.side == 'horde' : provider.config.side == 'horde';
+
+    AndroidBitmap<Object>? largeIcon;
+    final iconId = char?.id ?? charId;
+    if (iconId != null && iconId.isNotEmpty) {
+      largeIcon = await _getCharacterIcon(iconId);
     }
 
     String title = isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise';
-    if (charId != null) {
-      final char = provider.characters.where((c) => c.id == charId).firstOrNull;
-      if (char != null) title = '${char.name} : Permission requise';
-    }
+    if (char != null) title = '${char.name} : Permission requise';
 
     _notifs.show(
       event.timestamp ~/ 1000 + 1,
@@ -222,6 +235,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       client.close(force: true);
     } catch (_) {}
     return null;
+  }
+
+  Widget _buildAppBarAvatar(PeonForgeProvider provider) {
+    final fallback = Image.asset(
+      provider.config.faction == 'orc' ? 'assets/images/peon.gif' : 'assets/images/peasant.gif',
+      width: 28, height: 28,
+    );
+    if (provider.avatar.isEmpty) return fallback;
+    final url = 'https://peonforge.ch/assets/icons/${provider.avatar}.png';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Image.network(url, width: 28, height: 28, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback),
+    );
   }
 
   @override
@@ -265,10 +292,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Row(
           children: [
-            Image.asset(
-              provider.config.faction == 'orc' ? 'assets/images/peon.gif' : 'assets/images/peasant.gif',
-              width: 28, height: 28,
-            ),
+            _buildAppBarAvatar(provider),
             const SizedBox(width: 10),
             Text('PeonForge', style: Theme.of(context).textTheme.titleMedium),
             const Spacer(),

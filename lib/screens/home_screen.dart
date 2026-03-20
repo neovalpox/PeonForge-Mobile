@@ -61,8 +61,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     return Consumer<PeonForgeProvider>(builder: (ctx, p, _) {
       final tama = p.tamagotchi;
-      final charGif = p.config.faction == 'orc' ? 'assets/images/peon.gif' : 'assets/images/peasant.gif';
-      final charName = p.config.faction == 'orc' ? 'Peon' : 'Paysan';
+      final avatarChar = p.avatar.isNotEmpty ? p.characters.where((c) => c.id == p.avatar).firstOrNull : null;
+      final charName = avatarChar?.name ?? (p.config.faction == 'orc' ? 'Peon' : 'Paysan');
       final speech = _speechBubble ?? _randomSpeech(_idleSpeeches, p.config.faction);
 
       return ListView(
@@ -93,7 +93,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: Image.asset(charGif, fit: BoxFit.cover),
+                            child: avatarChar != null
+                                ? Image.network(avatarChar.iconUrl, fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Image.asset(
+                                      p.config.faction == 'orc' ? 'assets/images/peon.gif' : 'assets/images/peasant.gif',
+                                      fit: BoxFit.cover))
+                                : Image.asset(
+                                    p.config.faction == 'orc' ? 'assets/images/peon.gif' : 'assets/images/peasant.gif',
+                                    fit: BoxFit.cover),
                           ),
                         ),
                       ),
