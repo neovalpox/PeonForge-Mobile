@@ -16,6 +16,7 @@ class ConnectionService {
   String? _authToken;
   bool _connected = false;
   bool _tryingTunnel = false;
+  bool _tunnelWorked = false; // remember if tunnel connected successfully
 
   Stream<Map<String, dynamic>> get stateStream => _stateController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -29,6 +30,7 @@ class ConnectionService {
 
   void connect(String address, {bool isTunnel = false, String? lanFallback, String? tunnelFallback, int port = 7777, String? authToken}) {
     _tryingTunnel = false;
+    _tunnelWorked = false;
     if (authToken != null) _authToken = authToken;
 
     if (isTunnel) {
@@ -46,7 +48,11 @@ class ConnectionService {
     _cleanup();
 
     String? url;
-    if (!_tryingTunnel && _lanUrl != null) {
+    if (_tunnelWorked && _tunnelUrl != null) {
+      // Tunnel worked before — stay on tunnel, don't try LAN
+      url = _tunnelUrl;
+      _tryingTunnel = true;
+    } else if (!_tryingTunnel && _lanUrl != null) {
       url = _lanUrl;
     } else if (_tunnelUrl != null) {
       url = _tunnelUrl;
@@ -76,8 +82,9 @@ class ConnectionService {
       );
 
       _channel = IOWebSocketChannel(ws);
-      _log('Connected!');
+      _log('Connected${_tryingTunnel ? " (tunnel)" : " (LAN)"}!');
 
+      if (_tryingTunnel) _tunnelWorked = true;
       _connected = true;
       _connectionController.add(true);
 
@@ -115,7 +122,8 @@ class ConnectionService {
     }
     _pingTimer?.cancel();
 
-    if (!_tryingTunnel && _tunnelUrl != null) {
+    // If LAN failed and we have a tunnel, try tunnel
+    if (!_tryingTunnel && !_tunnelWorked && _tunnelUrl != null) {
       _tryingTunnel = true;
       _log('LAN failed, trying tunnel...');
       _reconnectTimer?.cancel();
@@ -123,10 +131,12 @@ class ConnectionService {
       return;
     }
 
-    _tryingTunnel = false;
-    _log('Reconnecting in 2s...');
+    // If tunnel was working, stay on tunnel for reconnect
+    if (_tunnelWorked) _tryingTunnel = true;
+
+    _log('Reconnecting in 3s...');
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 2), _doConnect);
+    _reconnectTimer = Timer(const Duration(seconds: 3), _doConnect);
   }
 
   void _cleanup() {

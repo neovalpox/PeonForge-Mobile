@@ -188,7 +188,9 @@ class PeonForgeProvider extends ChangeNotifier {
           _connection.updateTunnel(tunnelUrl!);
         }
       }
-      if (msg['lanIp'] != null) {
+      // Only save LAN IP if we already have one (connected via LAN initially)
+      // Don't set it if we connected via tunnel only — it's not reachable
+      if (msg['lanIp'] != null && serverIp != null) {
         final lip = msg['lanIp'] as String;
         if (lip.isNotEmpty && serverIp != lip) {
           serverIp = lip;
