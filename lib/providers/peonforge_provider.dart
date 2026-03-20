@@ -26,8 +26,8 @@ class PeonForgeProvider extends ChangeNotifier {
   String username = '';
   String avatar = ''; // character pack id for site profile
 
-  void Function(AppEvent)? onTaskComplete;
-  void Function(AppEvent)? onPermissionRequest;
+  Function(AppEvent)? onTaskComplete;
+  Function(AppEvent)? onPermissionRequest;
 
   ConnectionService get connection => _connection;
   Stream<bool> get connectionStream => _connection.connectionStream;

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -133,14 +135,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  void _onTaskComplete(AppEvent event) {
+  Future<void> _onTaskComplete(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
     final isOrc = provider.config.faction == 'orc';
 
+    // Try to get character icon for the notification
+    final charId = event.characterId;
+    AndroidBitmap<Object>? largeIcon;
+    if (charId != null && charId.isNotEmpty) {
+      largeIcon = await _getCharacterIcon(charId);
+    }
+
+    // Find character name for the title
+    String title = isOrc ? 'Zug zug !' : 'Travail termine !';
+    if (charId != null) {
+      final char = provider.characters.where((c) => c.id == charId).firstOrNull;
+      if (char != null) title = '${char.name} : Travail termine !';
+    }
+
     _notifs.show(
       event.timestamp ~/ 1000,
-      isOrc ? 'Zug zug !' : 'Travail termine !',
+      title,
       'Claude a fini sur ${event.project}',
       AndroidNotificationDetails(
         'peonforge_tasks', 'Taches',
@@ -149,19 +165,32 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         priority: Priority.high,
         sound: RawResourceAndroidNotificationSound(isOrc ? 'peon_complete' : 'task_complete'),
         playSound: true,
+        largeIcon: largeIcon,
       ).toNotificationDetails(),
       payload: payload,
     );
   }
 
-  void _onPermissionRequest(AppEvent event) {
+  Future<void> _onPermissionRequest(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
     final isOrc = provider.config.faction == 'orc';
 
+    final charId = event.characterId;
+    AndroidBitmap<Object>? largeIcon;
+    if (charId != null && charId.isNotEmpty) {
+      largeIcon = await _getCharacterIcon(charId);
+    }
+
+    String title = isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise';
+    if (charId != null) {
+      final char = provider.characters.where((c) => c.id == charId).firstOrNull;
+      if (char != null) title = '${char.name} : Permission requise';
+    }
+
     _notifs.show(
       event.timestamp ~/ 1000 + 1,
-      isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise',
+      title,
       '${event.project} attend une reponse',
       AndroidNotificationDetails(
         'peonforge_perms', 'Permissions',
@@ -170,9 +199,29 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         priority: Priority.max,
         sound: RawResourceAndroidNotificationSound(isOrc ? 'peon_question' : 'permission_required'),
         playSound: true,
+        largeIcon: largeIcon,
       ).toNotificationDetails(),
       payload: payload,
     );
+  }
+
+  Future<AndroidBitmap<Object>?> _getCharacterIcon(String charId) async {
+    try {
+      final url = 'https://peonforge.ch/assets/icons/$charId.png';
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+      final req = await client.getUrl(Uri.parse(url));
+      final res = await req.close().timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final bytes = await consolidateHttpClientResponseBytes(res);
+        // Save to temp file for notification
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/notif_icon_$charId.png');
+        await file.writeAsBytes(bytes);
+        return FilePathAndroidBitmap(file.path);
+      }
+      client.close(force: true);
+    } catch (_) {}
+    return null;
   }
 
   @override

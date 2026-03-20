@@ -85,14 +85,16 @@ class AppEvent {
   final String type;
   final String project;
   final String? sessionId;
+  final String? characterId; // pack id of the session's character
   final int timestamp;
 
-  AppEvent({required this.type, required this.project, this.sessionId, required this.timestamp});
+  AppEvent({required this.type, required this.project, this.sessionId, this.characterId, required this.timestamp});
 
   factory AppEvent.fromJson(Map<String, dynamic> json) => AppEvent(
     type: json['type'] ?? '',
     project: json['project'] ?? 'Projet',
     sessionId: json['sessionId'],
+    characterId: (json['character'] is Map) ? json['character']['id'] : null,
     timestamp: json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
   );
 
