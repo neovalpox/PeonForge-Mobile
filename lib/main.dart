@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -72,13 +73,24 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tab = 0;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _requestNotificationPermission();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reconnect WebSocket when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      final provider = context.read<PeonForgeProvider>();
+      if (!provider.connected && provider.serverIp != null) {
+        provider.reconnect();
+      }
+    }
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -96,20 +108,29 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _requestBatteryExemption() async {
     try {
-      // This opens the Android "battery optimization" dialog for the app
-      final android = _notifs.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      // We can't directly request battery exemption from Flutter without a plugin,
-      // but the wake lock + user setting "unrestricted" will do the job
-    } catch (_) {}
+      // Open Android battery optimization settings for this app
+      // This prompts the user to disable battery optimization
+      const channel = MethodChannel('com.peonforge/battery');
+      await channel.invokeMethod('requestBatteryExemption');
+    } catch (_) {
+      // Fallback: just rely on wakelock
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final provider = context.read<PeonForgeProvider>();
     _globalProvider = provider;
     provider.onTaskComplete = _onTaskComplete;
     provider.onPermissionRequest = _onPermissionRequest;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   void _onTaskComplete(AppEvent event) {

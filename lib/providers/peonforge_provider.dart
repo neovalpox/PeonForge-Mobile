@@ -75,6 +75,12 @@ class PeonForgeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void reconnect() {
+    if (serverIp != null) {
+      _connection.connect(serverIp!, port: port, tunnelFallback: tunnelUrl);
+    }
+  }
+
   void disconnect() async {
     _connection.disconnect();
     connected = false;
