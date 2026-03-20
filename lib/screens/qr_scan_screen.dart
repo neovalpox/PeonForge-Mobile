@@ -39,6 +39,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
       final tunnelUrl = data['tunnelUrl'] as String?;
       final lanIp = data['lanIp'] as String?;
       final port = data['port'] as int? ?? 7777;
+      final authToken = data['authToken'] as String? ?? '';
 
       final provider = context.read<PeonForgeProvider>();
 
@@ -62,11 +63,11 @@ class _QrScanScreenState extends State<QrScanScreen> {
         final tUrl = (tunnelUrl != null && tunnelUrl.isNotEmpty)
             ? tunnelUrl.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://')
             : null;
-        provider.connectTo(lanIp, port: port, tunnelFallback: tUrl);
+        provider.connectTo(lanIp, port: port, tunnelFallback: tUrl, authToken: authToken);
         setState(() => _status = 'Connexion a $lanIp...');
       } else if (tunnelUrl != null && tunnelUrl.isNotEmpty) {
         final wsUrl = tunnelUrl.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
-        provider.connectTo(wsUrl, isTunnel: true, port: port);
+        provider.connectTo(wsUrl, isTunnel: true, port: port, authToken: authToken);
         setState(() => _status = 'Connexion tunnel...');
       } else {
         setState(() { _status = 'QR invalide'; _scanned = false; });

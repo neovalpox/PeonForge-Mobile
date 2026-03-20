@@ -13,6 +13,7 @@ class ConnectionService {
   Timer? _pingTimer;
   String? _lanUrl;
   String? _tunnelUrl;
+  String? _authToken;
   bool _connected = false;
   bool _tryingTunnel = false;
 
@@ -26,8 +27,9 @@ class ConnectionService {
     _logController.add(msg);
   }
 
-  void connect(String address, {bool isTunnel = false, String? lanFallback, String? tunnelFallback, int port = 7777}) {
+  void connect(String address, {bool isTunnel = false, String? lanFallback, String? tunnelFallback, int port = 7777, String? authToken}) {
     _tryingTunnel = false;
+    if (authToken != null) _authToken = authToken;
 
     if (isTunnel) {
       _tunnelUrl = address;
@@ -56,6 +58,12 @@ class ConnectionService {
     if (url == null) {
       _log('No URL to connect to');
       return;
+    }
+
+    // Append auth token to URL
+    if (_authToken != null && _authToken!.isNotEmpty) {
+      final sep = url.contains('?') ? '&' : '?';
+      url = '$url${sep}token=$_authToken';
     }
 
     _log('Connecting to $url...');

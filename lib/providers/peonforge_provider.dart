@@ -14,6 +14,7 @@ class PeonForgeProvider extends ChangeNotifier {
   bool connected = false;
   String? serverIp;
   String? tunnelUrl;
+  String? authToken;
   int port = 7777;
   String hostname = '';
   PeonForgeConfig config = PeonForgeConfig();
@@ -45,39 +46,44 @@ class PeonForgeProvider extends ChangeNotifier {
     final savedIp = prefs.getString('server_ip');
     final savedTunnel = prefs.getString('tunnel_url');
     final savedPort = prefs.getInt('server_port') ?? 7777;
+    authToken = prefs.getString('auth_token');
 
     if (savedIp != null && savedIp.isNotEmpty) {
       serverIp = savedIp;
       tunnelUrl = savedTunnel;
       port = savedPort;
-      _connection.connect(savedIp, port: savedPort, tunnelFallback: savedTunnel);
+      _connection.connect(savedIp, port: savedPort, tunnelFallback: savedTunnel, authToken: authToken);
       notifyListeners();
     }
   }
 
-  void connectTo(String address, {bool isTunnel = false, String? tunnelFallback, int port = 7777}) async {
+  void connectTo(String address, {bool isTunnel = false, String? tunnelFallback, int port = 7777, String? authToken}) async {
     final prefs = await SharedPreferences.getInstance();
     this.port = port;
+    if (authToken != null && authToken.isNotEmpty) {
+      this.authToken = authToken;
+      await prefs.setString('auth_token', authToken);
+    }
 
     if (isTunnel) {
       tunnelUrl = address;
       await prefs.setString('tunnel_url', address);
       await prefs.setInt('server_port', port);
-      _connection.connect(address, isTunnel: true, port: port);
+      _connection.connect(address, isTunnel: true, port: port, authToken: this.authToken);
     } else {
       serverIp = address;
       tunnelUrl = tunnelFallback;
       await prefs.setString('server_ip', address);
       if (tunnelFallback != null) await prefs.setString('tunnel_url', tunnelFallback);
       await prefs.setInt('server_port', port);
-      _connection.connect(address, port: port, tunnelFallback: tunnelFallback);
+      _connection.connect(address, port: port, tunnelFallback: tunnelFallback, authToken: this.authToken);
     }
     notifyListeners();
   }
 
   void reconnect() {
     if (serverIp != null) {
-      _connection.connect(serverIp!, port: port, tunnelFallback: tunnelUrl);
+      _connection.connect(serverIp!, port: port, tunnelFallback: tunnelUrl, authToken: authToken);
     }
   }
 
@@ -235,8 +241,9 @@ class PeonForgeProvider extends ChangeNotifier {
     final ip = serverIp;
     if (ip == null) return;
     try {
+      final tokenParam = authToken != null ? '?token=$authToken' : '';
       final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
-      final url = Uri.parse('http://$ip:$port/send-keys');
+      final url = Uri.parse('http://$ip:$port/send-keys$tokenParam');
       final req = await client.postUrl(url);
       req.headers.contentType = ContentType.json;
       req.write(jsonEncode({'keys': keys}));
@@ -276,7 +283,8 @@ class PeonForgeProvider extends ChangeNotifier {
   Future<void> _focusViaHttp({String? sessionId, String? project}) async {
     // Try LAN first, then tunnel
     final urls = <String>[];
-    if (serverIp != null) urls.add('http://$serverIp:$port/focus');
+    final tokenParam = authToken != null ? '?token=$authToken' : '';
+    if (serverIp != null) urls.add('http://$serverIp:$port/focus$tokenParam');
     if (tunnelUrl != null) {
       final httpTunnel = tunnelUrl!.replaceFirst('wss://', 'https://').replaceFirst('ws://', 'http://');
       urls.add('$httpTunnel/focus');
