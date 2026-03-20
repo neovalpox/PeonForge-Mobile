@@ -231,6 +231,20 @@ class PeonForgeProvider extends ChangeNotifier {
     'type': 'set-session-character', 'sessionId': sessionId, 'characterId': characterId,
   });
 
+  Future<void> sendKeysViaHttp(String keys) async {
+    final ip = serverIp;
+    if (ip == null) return;
+    try {
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+      final url = Uri.parse('http://$ip:$port/send-keys');
+      final req = await client.postUrl(url);
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'keys': keys}));
+      await req.close().timeout(const Duration(seconds: 3));
+      client.close(force: true);
+    } catch (_) {}
+  }
+
   String? lastFocusDebug;
 
   Future<void> _saveTunnelUrl(String url) async {

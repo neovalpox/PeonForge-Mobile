@@ -107,16 +107,16 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   void _sendKeys(String keys) {
     final provider = context.read<PeonForgeProvider>();
-    // Find PID from sessions
-    int? pid;
-    if (widget.sessionId != null) {
-      final session = provider.sessions.where((s) => s.id == widget.sessionId).firstOrNull;
-      // pid not directly available in the model, send via project
-    }
-    provider.connection.trySend({
+    // Try WS first
+    final sent = provider.connection.trySend({
       'type': 'send-keys',
       'keys': keys,
     });
+    // Also try HTTP as fallback
+    if (!sent) {
+      provider.sendKeysViaHttp(keys);
+    }
+    debugPrint('[Terminal] sendKeys "$keys" -> ws=$sent');
   }
 
   void _sendInput() {
