@@ -34,8 +34,8 @@ Necessite Flutter 3.29+ et JDK 17.
 
 ## Repos lies
 
-- [PeonForge](https://github.com/neovalpox/PeonForge) — Overlay desktop + site web + API
-- [PeonForge-Mobile](https://github.com/neovalpox/PeonForge-Mobile) — Ce repo
+- [PeonForge-Overlay](https://github.com/neovalpox/PeonForge-Overlay) — Overlay desktop (Electron)
+- [PeonForge-Mobile](https://github.com/neovalpox/PeonForge-Mobile) — Ce repo (Flutter Android)
 
 ---
 
