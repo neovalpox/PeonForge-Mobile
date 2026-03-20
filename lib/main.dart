@@ -138,10 +138,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _onTaskComplete(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
-    final isOrc = provider.config.faction == 'orc';
+    final isOrc = provider.config.side == 'horde';
 
-    // Try to get character icon for the notification
     final charId = event.characterId;
+    debugPrint('[PeonForge] Notification: charId=$charId project=${event.project}');
     AndroidBitmap<Object>? largeIcon;
     if (charId != null && charId.isNotEmpty) {
       largeIcon = await _getCharacterIcon(charId);
