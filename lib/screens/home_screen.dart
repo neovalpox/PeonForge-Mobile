@@ -23,13 +23,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     'human': ["Hehe, ca chatouille !", "Oui milord ?", "A vos ordres !", "Merci sire !", "Hm ?"],
     'orc': ["Hehe !", "Zug zug !", "Moe content !", "Dabu !", "Grr..."],
   };
-  static const _feedSpeeches = {
-    'human': ["Miam ! Merci sire !", "Du pain ! Excellent !", "J'avais faim !", "Ca fait du bien !"],
-    'orc': ["Moe mange !", "Miam miam !", "Viande ! Moe content !", "Zug zug, merci chef !"],
-  };
-  static const _trainSpeeches = {
-    'human': ["En garde !", "Je vais devenir fort !", "Entrainement !", "Pour l'Alliance !"],
-    'orc': ["Moe s'entraine !", "Lok'tar ogar !", "Plus fort !", "Pour la Horde !"],
+  static const _walkSpeeches = {
+    'human': ["Bien marche sire !", "Les jambes sont solides !", "On avance bien !", "Pour la sante !"],
+    'orc': ["Moe marche !", "Zug zug, bonne route !", "Moe fort jambes !", "Lok'tar, on avance !"],
   };
   static const _idleSpeeches = {
     'human': ["J'attends vos ordres.", "Du travail ?", "Pret !", "Oui milord ?"],
@@ -60,35 +56,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _speechBubble = null); });
   }
 
-  void _onFeed(PeonForgeProvider p) {
-    if (p.tamagotchi.gold < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pas assez d\'or (10 requis)'), backgroundColor: WC3Colors.red),
-      );
-      return;
-    }
-    p.feedPeon();
-    setState(() => _speechBubble = _randomSpeech(_feedSpeeches, p.config.faction));
-    Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _speechBubble = null); });
-  }
-
-  void _onTrain(PeonForgeProvider p) {
-    if (p.tamagotchi.gold < 25) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pas assez d\'or (25 requis)'), backgroundColor: WC3Colors.red),
-      );
-      return;
-    }
-    if (p.tamagotchi.xpBoost) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Deja en entrainement !'), backgroundColor: WC3Colors.goldDark),
-      );
-      return;
-    }
-    p.trainPeon();
-    setState(() => _speechBubble = _randomSpeech(_trainSpeeches, p.config.faction));
-    Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _speechBubble = null); });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,30 +146,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
 
-                // Happiness bar
+                // Step counter / happiness
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Bonheur', style: TextStyle(color: WC3Colors.textDim, fontSize: 11)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: tama.happiness / 100,
-                          minHeight: 6,
-                          backgroundColor: WC3Colors.bgSurface,
-                          valueColor: AlwaysStoppedAnimation(
-                            tama.happiness > 60 ? WC3Colors.green :
-                            tama.happiness > 30 ? WC3Colors.goldLight : WC3Colors.red,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('${tama.happiness}%', style: const TextStyle(color: WC3Colors.textMid, fontSize: 11)),
-                  ],
-                ),
+                _buildStepCounter(p, tama),
               ],
             ),
           ),
@@ -219,19 +165,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
 
-          // Interaction buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                Expanded(child: _actionButton('Caresser', 'Gratuit', WC3Colors.blue, () => _onPet(p))),
-                const SizedBox(width: 8),
-                Expanded(child: _actionButton('Nourrir', '10 Or', WC3Colors.green, () => _onFeed(p))),
-                const SizedBox(width: 8),
-                Expanded(child: _actionButton('Entrainer', '25 Or', WC3Colors.purple, () => _onTrain(p))),
-              ],
-            ),
-          ),
 
           // Active sessions
           if (p.sessions.isNotEmpty) ...[
@@ -275,25 +208,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  Widget _actionButton(String label, String cost, Color color, VoidCallback onTap) {
+  Widget _buildStepCounter(PeonForgeProvider p, TamagotchiState tama) {
+    final steps = p.dailySteps > 0 ? p.dailySteps : tama.dailySteps;
+    final progress = (steps / 10000).clamp(0.0, 1.0);
+    final color = progress > 0.6 ? WC3Colors.green : progress > 0.3 ? WC3Colors.goldLight : WC3Colors.red;
+    final isOrc = p.config.faction == 'orc';
+
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          children: [
-            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text(cost, style: TextStyle(color: color.withValues(alpha: 0.6), fontSize: 10)),
-          ],
-        ),
+      onTap: () {
+        setState(() => _speechBubble = _randomSpeech(_walkSpeeches, p.config.faction));
+        Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _speechBubble = null); });
+      },
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.directions_walk, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text('${_formatSteps(steps)} / 10 000 pas',
+                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text('${tama.happiness}%', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 4),
+              Text(isOrc ? 'content' : 'heureux', style: const TextStyle(color: WC3Colors.textDim, fontSize: 10)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: WC3Colors.bgSurface,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  String _formatSteps(int steps) {
+    if (steps >= 1000) {
+      return '${(steps / 1000).toStringAsFixed(1).replaceAll('.0', '')} k';
+    }
+    return '$steps';
   }
 
   Widget _sectionTitle(String text) {

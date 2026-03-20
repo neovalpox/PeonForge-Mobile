@@ -2,14 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:pedometer_2/pedometer_2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
+
+final Pedometer _pedometer = Pedometer();
 
 class PeonForgeProvider extends ChangeNotifier {
   final ConnectionService _connection = ConnectionService();
   StreamSubscription? _stateSub;
   StreamSubscription? _connSub;
+  StreamSubscription<int>? _stepSub;
+  int dailySteps = 0;
+  String _stepsDate = '';
+  int _stepBaseline = 0; // pedometer total at midnight reset
 
   bool connected = false;
   String? serverIp;
@@ -39,6 +46,59 @@ class PeonForgeProvider extends ChangeNotifier {
     });
     _stateSub = _connection.stateStream.listen(_handleMessage);
     _loadSaved();
+    _initPedometer();
+  }
+
+  void _initPedometer() {
+    _loadStepState();
+    _stepSub = _pedometer.stepCountStream().listen(_onStepCount, onError: (e) {
+      debugPrint('[PeonForge] Pedometer error: $e');
+    });
+  }
+
+  Future<void> _loadStepState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = prefs.getString('steps_date') ?? '';
+    if (savedDate == today) {
+      dailySteps = prefs.getInt('daily_steps') ?? 0;
+      _stepBaseline = prefs.getInt('step_baseline') ?? 0;
+    } else {
+      // New day — reset
+      dailySteps = 0;
+      _stepBaseline = 0;
+      _stepsDate = today;
+    }
+    _stepsDate = today;
+  }
+
+  void _onStepCount(int totalSteps) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    if (_stepsDate != today) {
+      // Day changed — reset baseline to current total
+      _stepBaseline = totalSteps;
+      dailySteps = 0;
+      _stepsDate = today;
+    }
+
+    if (_stepBaseline == 0) {
+      // First reading: set baseline so daily starts from 0
+      _stepBaseline = totalSteps - dailySteps;
+    }
+
+    dailySteps = totalSteps - _stepBaseline;
+    if (dailySteps < 0) dailySteps = 0;
+
+    // Persist locally
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('daily_steps', dailySteps);
+    await prefs.setInt('step_baseline', _stepBaseline);
+    await prefs.setString('steps_date', today);
+
+    // Send to server
+    _connection.send({'type': 'set-steps', 'steps': dailySteps});
+    notifyListeners();
   }
 
   Future<void> _loadSaved() async {
@@ -230,9 +290,7 @@ class PeonForgeProvider extends ChangeNotifier {
     notifyListeners();
     _connection.send({'type': 'set-avatar', 'avatar': avatarId});
   }
-  void feedPeon() => _connection.send({'type': 'interact', 'action': 'feed'});
   void petPeon() => _connection.send({'type': 'interact', 'action': 'pet'});
-  void trainPeon() => _connection.send({'type': 'interact', 'action': 'train'});
   void setSessionCharacter(String sessionId, String characterId) => _connection.send({
     'type': 'set-session-character', 'sessionId': sessionId, 'characterId': characterId,
   });
@@ -322,6 +380,7 @@ class PeonForgeProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stepSub?.cancel();
     _stateSub?.cancel();
     _connSub?.cancel();
     _connection.dispose();

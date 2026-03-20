@@ -53,6 +53,7 @@ class Session {
 class TamagotchiState {
   final int xp, gold, level, xpInLevel, xpForLevel, tasksCompleted, totalWorkTime;
   final int happiness; // 0-100
+  final int dailySteps; // steps today
   final int lastFed;   // timestamp
   final int lastPet;   // timestamp
   final bool xpBoost;  // training active
@@ -61,7 +62,8 @@ class TamagotchiState {
     this.xp = 0, this.gold = 0, this.level = 1,
     this.xpInLevel = 0, this.xpForLevel = 50,
     this.tasksCompleted = 0, this.totalWorkTime = 0,
-    this.happiness = 50, this.lastFed = 0, this.lastPet = 0, this.xpBoost = false,
+    this.happiness = 50, this.dailySteps = 0,
+    this.lastFed = 0, this.lastPet = 0, this.xpBoost = false,
   });
 
   factory TamagotchiState.fromJson(Map<String, dynamic> json) => TamagotchiState(
@@ -73,6 +75,7 @@ class TamagotchiState {
     tasksCompleted: json['tasksCompleted'] ?? 0,
     totalWorkTime: json['totalWorkTime'] ?? 0,
     happiness: json['happiness'] ?? 50,
+    dailySteps: json['dailySteps'] ?? 0,
     lastFed: json['lastFed'] ?? 0,
     lastPet: json['lastPet'] ?? 0,
     xpBoost: json['xpBoost'] ?? false,
