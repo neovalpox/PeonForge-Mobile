@@ -48,11 +48,7 @@ class ConnectionService {
     _cleanup();
 
     String? url;
-    if (_tunnelWorked && _tunnelUrl != null) {
-      // Tunnel worked before — stay on tunnel, don't try LAN
-      url = _tunnelUrl;
-      _tryingTunnel = true;
-    } else if (!_tryingTunnel && _lanUrl != null) {
+    if (!_tryingTunnel && _lanUrl != null) {
       url = _lanUrl;
     } else if (_tunnelUrl != null) {
       url = _tunnelUrl;
@@ -119,21 +115,22 @@ class ConnectionService {
     if (_connected) {
       _connected = false;
       _connectionController.add(false);
+      // Connection was active and dropped — reset tunnel preference to try both
+      _tunnelWorked = false;
     }
     _pingTimer?.cancel();
 
-    // If LAN failed and we have a tunnel, try tunnel
-    if (!_tryingTunnel && !_tunnelWorked && _tunnelUrl != null) {
+    // Try LAN first, then tunnel fallback
+    if (!_tryingTunnel && _tunnelUrl != null) {
       _tryingTunnel = true;
-      _log('LAN failed, trying tunnel...');
+      _log('Trying tunnel fallback...');
       _reconnectTimer?.cancel();
       _reconnectTimer = Timer(const Duration(seconds: 1), _doConnect);
       return;
     }
 
-    // If tunnel was working, stay on tunnel for reconnect
-    if (_tunnelWorked) _tryingTunnel = true;
-
+    // Both failed — reset and try LAN again
+    _tryingTunnel = false;
     _log('Reconnecting in 3s...');
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 3), _doConnect);
