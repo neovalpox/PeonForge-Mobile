@@ -50,7 +50,8 @@ class Session {
   );
 
   Duration get elapsed => Duration(milliseconds: DateTime.now().millisecondsSinceEpoch - startTime);
-  bool get isIdle => (DateTime.now().millisecondsSinceEpoch - lastEventTime) > 120000; // >2min
+  // Scanned sessions (eventCount=0) are always working; hook sessions idle if >2min no event
+  bool get isIdle => eventCount > 0 && (DateTime.now().millisecondsSinceEpoch - lastEventTime) > 120000;
 }
 
 class TamagotchiState {
