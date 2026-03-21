@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
@@ -31,6 +32,11 @@ class PeonForgeProvider extends ChangeNotifier {
   List<Achievement> achievements = [];
   List<DailyStats> dailyStats = [];
   bool loadingStats = false;
+  List<Duel> duels = [];
+  bool loadingDuels = false;
+  List<Guild> guilds = [];
+  Guild? myGuild;
+  bool loadingGuilds = false;
 
   Function(AppEvent)? onTaskComplete;
   Function(AppEvent)? onPermissionRequest;
@@ -199,6 +205,7 @@ class PeonForgeProvider extends ChangeNotifier {
         }
       }
       notifyListeners();
+      _updateHomeWidget();
       return;
     }
 
@@ -227,6 +234,7 @@ class PeonForgeProvider extends ChangeNotifier {
       }
 
       notifyListeners();
+      if (msg['tamagotchi'] != null) _updateHomeWidget();
       return;
     }
 
@@ -237,11 +245,13 @@ class PeonForgeProvider extends ChangeNotifier {
     if (msg['registered'] == true) lastRegisterError = null;
 
     // Tamagotchi interaction response (from feed/pet/train — no 'type' field)
-    if (msg['tamagotchi'] != null) tamagotchi = TamagotchiState.fromJson(msg['tamagotchi']);
+    final hadTamagotchiUpdate = msg['tamagotchi'] != null;
+    if (hadTamagotchiUpdate) tamagotchi = TamagotchiState.fromJson(msg['tamagotchi']);
     if (msg['interaction'] != null) lastInteraction = msg['interaction'] as Map<String, dynamic>;
     if (msg['sessions'] != null) sessions = (msg['sessions'] as List).map((s) => Session.fromJson(s)).toList();
     if (msg['mood'] != null) mood = msg['mood'];
     notifyListeners();
+    if (hadTamagotchiUpdate) _updateHomeWidget();
   }
 
   Map<String, dynamic>? lastInteraction;
@@ -405,6 +415,136 @@ class PeonForgeProvider extends ChangeNotifier {
 
     loadingStats = false;
     notifyListeners();
+  }
+
+  // ---- Duels ----
+
+  Future<void> fetchDuels() async {
+    if (username.isEmpty) return;
+    loadingDuels = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('https://peonforge.ch/api/duels?player=$username');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(url);
+      final res = await req.close().timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = await res.transform(utf8.decoder).join();
+        final data = jsonDecode(body);
+        if (data is List) {
+          duels = data.map((d) => Duel.fromJson(d)).toList();
+        } else if (data['duels'] != null) {
+          duels = (data['duels'] as List).map((d) => Duel.fromJson(d)).toList();
+        }
+      }
+      client.close(force: true);
+    } catch (e) {
+      debugPrint('[PeonForge] fetchDuels error: $e');
+    }
+
+    loadingDuels = false;
+    notifyListeners();
+  }
+
+  void createDuel(String challenged, String stat) {
+    _connection.send({'type': 'create-duel', 'challenged': challenged, 'stat': stat});
+  }
+
+  // ---- Guilds ----
+
+  Future<void> fetchGuilds() async {
+    loadingGuilds = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('https://peonforge.ch/api/guilds');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(url);
+      final res = await req.close().timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = await res.transform(utf8.decoder).join();
+        final data = jsonDecode(body);
+        if (data is List) {
+          guilds = data.map((g) => Guild.fromJson(g)).toList();
+        } else if (data['guilds'] != null) {
+          guilds = (data['guilds'] as List).map((g) => Guild.fromJson(g)).toList();
+        }
+        // Find my guild
+        if (username.isNotEmpty) {
+          myGuild = guilds.where((g) => g.members.any((m) => m.username == username)).firstOrNull;
+        }
+      }
+      client.close(force: true);
+    } catch (e) {
+      debugPrint('[PeonForge] fetchGuilds error: $e');
+    }
+
+    loadingGuilds = false;
+    notifyListeners();
+  }
+
+  void createGuild(String name, String tag, String faction) {
+    _connection.send({'type': 'create-guild', 'name': name, 'tag': tag, 'faction': faction});
+  }
+
+  void joinGuild(String tag) {
+    _connection.send({'type': 'join-guild', 'tag': tag});
+  }
+
+  void leaveGuild() {
+    _connection.send({'type': 'leave-guild'});
+    myGuild = null;
+    notifyListeners();
+  }
+
+  // ---- Leaderboard (for duel target picking) ----
+
+  List<Map<String, dynamic>> leaderboard = [];
+  bool loadingLeaderboard = false;
+
+  Future<void> fetchLeaderboard() async {
+    loadingLeaderboard = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('https://peonforge.ch/api/leaderboard');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(url);
+      final res = await req.close().timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = await res.transform(utf8.decoder).join();
+        final data = jsonDecode(body);
+        if (data is List) {
+          leaderboard = data.cast<Map<String, dynamic>>();
+        } else if (data['players'] != null) {
+          leaderboard = (data['players'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+      client.close(force: true);
+    } catch (e) {
+      debugPrint('[PeonForge] fetchLeaderboard error: $e');
+    }
+
+    loadingLeaderboard = false;
+    notifyListeners();
+  }
+
+  /// Save tamagotchi data to SharedPreferences and trigger Android home widget update.
+  Future<void> _updateHomeWidget() async {
+    try {
+      await HomeWidget.saveWidgetData<int>('level', tamagotchi.level);
+      await HomeWidget.saveWidgetData<int>('xp_progress', (tamagotchi.xpProgress * 100).round());
+      await HomeWidget.saveWidgetData<int>('tasks_today', tamagotchi.tasksCompleted);
+      await HomeWidget.saveWidgetData<int>('steps_today', tamagotchi.dailySteps);
+      await HomeWidget.saveWidgetData<int>('happiness', tamagotchi.happiness);
+      await HomeWidget.saveWidgetData<String>('faction', config.faction);
+      await HomeWidget.updateWidget(
+        androidName: 'PeonForgeWidgetProvider',
+      );
+    } catch (e) {
+      debugPrint('[PeonForge] HomeWidget update error: $e');
+    }
   }
 
   @override
