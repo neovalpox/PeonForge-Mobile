@@ -2,19 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:pedometer_2/pedometer_2.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
 
-final Pedometer _pedometer = Pedometer();
+const _stepChannel = MethodChannel('com.peonforge/steps');
+const _stepStream = EventChannel('com.peonforge/step_stream');
 
 class PeonForgeProvider extends ChangeNotifier {
   final ConnectionService _connection = ConnectionService();
   StreamSubscription? _stateSub;
   StreamSubscription? _connSub;
-  StreamSubscription<int>? _stepSub;
+  StreamSubscription? _stepSub;
   Timer? _stepPollTimer;
   int dailySteps = 0;
   String _stepsDate = '';
@@ -54,52 +55,37 @@ class PeonForgeProvider extends ChangeNotifier {
   void _initPedometer() async {
     await _loadStepState();
 
+    if (!Platform.isAndroid) return;
+
     // Request ACTIVITY_RECOGNITION permission (required on Android 10+)
-    if (Platform.isAndroid) {
-      final status = await Permission.activityRecognition.request();
-      debugPrint('[PeonForge] Activity recognition permission: $status');
-      if (!status.isGranted) {
-        debugPrint('[PeonForge] Pedometer permission denied');
-        return;
-      }
+    final status = await Permission.activityRecognition.request();
+    debugPrint('[PeonForge] Activity recognition permission: $status');
+    if (!status.isGranted) {
+      debugPrint('[PeonForge] Pedometer permission denied');
+      return;
     }
 
-    // Get today's steps immediately (don't wait for a step to be taken)
+    // Check if sensor is available
     try {
-      final now = DateTime.now();
-      final midnight = DateTime(now.year, now.month, now.day);
-      final todaySteps = await _pedometer.getStepCount(from: midnight, to: now);
-      debugPrint('[PeonForge] Initial step count today: $todaySteps');
-      if (todaySteps > 0) {
-        dailySteps = todaySteps;
-        _stepBaseline = -1; // mark as using getStepCount, not stream baseline
-        _sendSteps();
-      }
+      final hasSensor = await _stepChannel.invokeMethod<bool>('hasSensor') ?? false;
+      debugPrint('[PeonForge] Step sensor available: $hasSensor');
+      if (!hasSensor) return;
     } catch (e) {
-      debugPrint('[PeonForge] getStepCount error: $e');
+      debugPrint('[PeonForge] Step sensor check error: $e');
+      return;
     }
 
-    // Listen for live step updates
-    _stepSub = _pedometer.stepCountStream().listen(_onStepCount, onError: (e) {
-      debugPrint('[PeonForge] Pedometer stream error: $e');
-    });
-
-    // Poll every 60s as fallback (some devices don't fire the stream reliably)
-    _stepPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => _pollSteps());
-  }
-
-  Future<void> _pollSteps() async {
-    try {
-      final now = DateTime.now();
-      final midnight = DateTime(now.year, now.month, now.day);
-      final todaySteps = await _pedometer.getStepCount(from: midnight, to: now);
-      if (todaySteps > dailySteps) {
-        dailySteps = todaySteps;
-        _stepBaseline = -1;
+    // Listen for live step updates from native sensor (daily steps directly)
+    _stepSub = _stepStream.receiveBroadcastStream().listen((event) {
+      final steps = event as int;
+      debugPrint('[PeonForge] Native step event: $steps daily steps');
+      if (steps > dailySteps || dailySteps == 0) {
+        dailySteps = steps;
         _sendSteps();
-        debugPrint('[PeonForge] Poll steps: $todaySteps');
       }
-    } catch (_) {}
+    }, onError: (e) {
+      debugPrint('[PeonForge] Step stream error: $e');
+    });
   }
 
   Future<void> _loadStepState() async {
@@ -116,28 +102,6 @@ class PeonForgeProvider extends ChangeNotifier {
       _stepsDate = today;
     }
     _stepsDate = today;
-  }
-
-  void _onStepCount(int totalSteps) async {
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    debugPrint('[PeonForge] Step stream event: $totalSteps (baseline=$_stepBaseline)');
-
-    if (_stepsDate != today) {
-      _stepBaseline = totalSteps;
-      dailySteps = 0;
-      _stepsDate = today;
-    }
-
-    if (_stepBaseline <= 0) {
-      // First stream reading: set baseline so daily count matches getStepCount
-      _stepBaseline = totalSteps - dailySteps;
-      if (_stepBaseline < 0) _stepBaseline = 0;
-    }
-
-    dailySteps = totalSteps - _stepBaseline;
-    if (dailySteps < 0) dailySteps = 0;
-
-    _sendSteps();
   }
 
   void _sendSteps() async {
