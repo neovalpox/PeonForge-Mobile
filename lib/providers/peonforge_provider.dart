@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:pedometer_2/pedometer_2.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
@@ -49,8 +50,19 @@ class PeonForgeProvider extends ChangeNotifier {
     _initPedometer();
   }
 
-  void _initPedometer() {
+  void _initPedometer() async {
     _loadStepState();
+
+    // Request ACTIVITY_RECOGNITION permission (required on Android 10+)
+    if (Platform.isAndroid) {
+      final status = await Permission.activityRecognition.request();
+      debugPrint('[PeonForge] Activity recognition permission: $status');
+      if (!status.isGranted) {
+        debugPrint('[PeonForge] Pedometer permission denied');
+        return;
+      }
+    }
+
     _stepSub = _pedometer.stepCountStream().listen(_onStepCount, onError: (e) {
       debugPrint('[PeonForge] Pedometer error: $e');
     });
