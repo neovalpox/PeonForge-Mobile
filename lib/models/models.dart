@@ -1,4 +1,5 @@
 import 'dart:ui' show Color;
+import 'package:flutter/widgets.dart' show IconData;
 
 class SessionCharacter {
   final String id;
@@ -186,6 +187,85 @@ class GameCharacter {
   }
 
   String get iconUrl => 'https://peonforge.ch/assets/icons/$id.png';
+}
+
+class Achievement {
+  final String id;
+  final String name;
+  final String description;
+  final String icon;
+  final String tier; // common, rare, epic, legendary
+  final bool unlocked;
+  final int? unlockedAt; // timestamp
+
+  Achievement({
+    required this.id,
+    required this.name,
+    required this.description,
+    this.icon = '',
+    this.tier = 'common',
+    this.unlocked = false,
+    this.unlockedAt,
+  });
+
+  factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
+    id: json['id'] ?? '',
+    name: json['name'] ?? '',
+    description: json['description'] ?? '',
+    icon: json['icon'] ?? '',
+    tier: json['tier'] ?? 'common',
+    unlocked: json['unlocked'] ?? false,
+    unlockedAt: json['unlockedAt'],
+  );
+
+  Color get tierColor {
+    switch (tier) {
+      case 'common': return const Color(0xFF5AFF5A);
+      case 'rare': return const Color(0xFF64C8FF);
+      case 'epic': return const Color(0xFFB482FF);
+      case 'legendary': return const Color(0xFFFFD700);
+      case 'mythic': return const Color(0xFFFF5050);
+      default: return const Color(0xFFC8B88A);
+    }
+  }
+
+  IconData get iconData {
+    switch (icon) {
+      case 'tasks': return const IconData(0xe86c, fontFamily: 'MaterialIcons'); // check_circle
+      case 'streak': return const IconData(0xe80e, fontFamily: 'MaterialIcons'); // whatshot
+      case 'level': return const IconData(0xe838, fontFamily: 'MaterialIcons'); // star
+      case 'gold': return const IconData(0xf04b6, fontFamily: 'MaterialIcons'); // paid
+      case 'steps': return const IconData(0xe566, fontFamily: 'MaterialIcons'); // directions_walk
+      case 'time': return const IconData(0xe425, fontFamily: 'MaterialIcons'); // schedule
+      case 'errors': return const IconData(0xe15a, fontFamily: 'MaterialIcons'); // bug_report
+      case 'social': return const IconData(0xe7ef, fontFamily: 'MaterialIcons'); // group
+      default: return const IconData(0xf0674, fontFamily: 'MaterialIcons'); // emoji_events
+    }
+  }
+}
+
+class DailyStats {
+  final String date;
+  final int tasks;
+  final int steps;
+  final int workMinutes;
+  final int xpGained;
+
+  DailyStats({
+    required this.date,
+    this.tasks = 0,
+    this.steps = 0,
+    this.workMinutes = 0,
+    this.xpGained = 0,
+  });
+
+  factory DailyStats.fromJson(Map<String, dynamic> json) => DailyStats(
+    date: json['date'] ?? '',
+    tasks: json['tasks'] ?? 0,
+    steps: json['steps'] ?? 0,
+    workMinutes: json['workMinutes'] ?? 0,
+    xpGained: json['xpGained'] ?? 0,
+  );
 }
 
 class PeonForgeConfig {

@@ -28,6 +28,9 @@ class PeonForgeProvider extends ChangeNotifier {
   List<GameCharacter> characters = [];
   String username = '';
   String avatar = ''; // character pack id for site profile
+  List<Achievement> achievements = [];
+  List<DailyStats> dailyStats = [];
+  bool loadingStats = false;
 
   Function(AppEvent)? onTaskComplete;
   Function(AppEvent)? onPermissionRequest;
@@ -168,6 +171,10 @@ class PeonForgeProvider extends ChangeNotifier {
       }
       if (msg['username'] != null) username = msg['username'] as String;
       if (msg['avatar'] != null) avatar = msg['avatar'] as String;
+      // Parse achievements
+      if (msg['achievements'] != null) {
+        achievements = (msg['achievements'] as List).map((a) => Achievement.fromJson(a)).toList();
+      }
       // Parse characters catalog
       if (msg['characters'] != null) {
         characters = (msg['characters'] as List).map((c) => GameCharacter.fromJson(c)).toList();
@@ -371,6 +378,32 @@ class PeonForgeProvider extends ChangeNotifier {
       }
     }
     lastFocusDebug = 'All HTTP failed';
+    notifyListeners();
+  }
+
+  Future<void> fetchStats({int days = 30}) async {
+    if (username.isEmpty) return;
+    loadingStats = true;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('https://peonforge.ch/api/player/$username/stats?days=$days');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(url);
+      final res = await req.close().timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = await res.transform(utf8.decoder).join();
+        final data = jsonDecode(body);
+        if (data['days'] != null) {
+          dailyStats = (data['days'] as List).map((d) => DailyStats.fromJson(d)).toList();
+        }
+      }
+      client.close(force: true);
+    } catch (e) {
+      debugPrint('[PeonForge] fetchStats error: $e');
+    }
+
+    loadingStats = false;
     notifyListeners();
   }
 

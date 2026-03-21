@@ -7,6 +7,8 @@ import '../theme/wc3_theme.dart';
 import '../widgets/gold_card.dart';
 import '../widgets/xp_bar.dart';
 import '../models/models.dart';
+import 'achievements_screen.dart';
+import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -197,9 +199,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           else
             ...p.recentEvents.take(10).map((e) => _eventTile(e, p)),
 
-          // PeonForge link
+          // Quick links
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: WC3Colors.goldDark),
+                      foregroundColor: WC3Colors.goldLight,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(Icons.emoji_events, size: 16),
+                    label: const Text('Hauts faits', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen())),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: WC3Colors.goldDark),
+                      foregroundColor: WC3Colors.goldLight,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(Icons.bar_chart, size: 16),
+                    label: const Text('Stats', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // PeonForge link
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: OutlinedButton(
               onPressed: () => launchUrl(Uri.parse('https://peonforge.ch'), mode: LaunchMode.externalApplication),
               style: OutlinedButton.styleFrom(
