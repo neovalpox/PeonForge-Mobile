@@ -301,19 +301,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _fmtTokens(int t) => t >= 1e9 ? '${(t / 1e9).toStringAsFixed(1)}G' : t >= 1e6 ? '${(t / 1e6).toStringAsFixed(1)}M' : t >= 1e3 ? '${(t / 1e3).round()}K' : '$t';
 
   Widget _buildUsageWidget(UsageStats usage) {
-    Widget bar(String label, int tokens, double budget, Color color) {
-      final pct = (tokens / budget).clamp(0.0, 1.0);
-      final barColor = pct >= 0.8 ? WC3Colors.red : pct >= 0.5 ? WC3Colors.goldLight : color;
+    final maxMonth = usage.monthTokens > 0 ? usage.monthTokens : 1;
+    Widget bar(String label, int tokens, Color color) {
+      final pct = (tokens / maxMonth).clamp(0.0, 1.0);
       return Row(
         children: [
-          SizedBox(width: 14, child: Text(label, style: TextStyle(color: barColor, fontSize: 8, fontWeight: FontWeight.w700))),
+          SizedBox(width: 14, child: Text(label, style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w700))),
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(value: pct, minHeight: 3, backgroundColor: WC3Colors.bgSurface, valueColor: AlwaysStoppedAnimation(barColor)),
+              child: LinearProgressIndicator(value: pct, minHeight: 3, backgroundColor: WC3Colors.bgSurface, valueColor: AlwaysStoppedAnimation(color)),
             ),
           ),
-          SizedBox(width: 32, child: Text(_fmtTokens(tokens), textAlign: TextAlign.right, style: TextStyle(color: barColor, fontSize: 8))),
+          SizedBox(width: 32, child: Text(_fmtTokens(tokens), textAlign: TextAlign.right, style: TextStyle(color: color, fontSize: 8))),
         ],
       );
     }
@@ -329,11 +329,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ],
         ),
         const SizedBox(height: 4),
-        bar('J', usage.todayTokens, 500e6, WC3Colors.blue),
+        bar('J', usage.todayTokens, WC3Colors.blue),
         const SizedBox(height: 2),
-        bar('S', usage.weekTokens, 2e9, WC3Colors.purple),
+        bar('S', usage.weekTokens, WC3Colors.purple),
         const SizedBox(height: 2),
-        bar('M', usage.monthTokens, 5e9, WC3Colors.goldLight),
+        bar('M', usage.monthTokens, WC3Colors.goldLight),
       ],
     );
   }
