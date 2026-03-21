@@ -160,14 +160,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       debugPrint('[PeonForge] Notification icon: $iconId, loaded=${largeIcon != null}');
     }
 
-    String title = isOrc ? 'Zug zug !' : 'Travail termine !';
-    if (char != null) title = '${char.name} : Travail termine !';
+    final charName = char?.name ?? (isOrc ? 'Peon' : 'Paysan');
+    final title = isOrc
+        ? '$charName a fini, chef !'
+        : '$charName a termine son travail !';
 
     try {
       await _notifs.show(
         event.timestamp ~/ 1000,
         title,
-        'Claude a fini sur ${event.project}',
+        event.project,
         AndroidNotificationDetails(
           'peonforge_tasks', 'Taches',
           channelDescription: 'Notifications de taches terminees',
@@ -203,14 +205,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       largeIcon = await _getCharacterIcon(iconId);
     }
 
-    String title = isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise';
-    if (char != null) title = '${char.name} : Permission requise';
+    final charName = char?.name ?? (isOrc ? 'Peon' : 'Paysan');
+    final title = isOrc
+        ? '$charName a besoin d\'ordres !'
+        : '$charName attend vos instructions !';
 
     try {
       await _notifs.show(
         event.timestamp ~/ 1000 + 1,
         title,
-        '${event.project} attend une reponse',
+        event.project,
         AndroidNotificationDetails(
           'peonforge_perms', 'Permissions',
           channelDescription: 'Demandes de permission',
