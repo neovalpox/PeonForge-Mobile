@@ -98,7 +98,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _requestNotificationPermission() async {
     final android = _notifs.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
-      await android.requestNotificationsPermission();
+      final granted = await android.requestNotificationsPermission();
+      debugPrint('[PeonForge] Notification permission: $granted');
     }
     // Keep screen/CPU wake to maintain WebSocket alive in background
     WakelockPlus.enable();
@@ -140,7 +141,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final provider = context.read<PeonForgeProvider>();
 
     final charId = event.characterId;
-    debugPrint('[PeonForge] Notification: charId=$charId project=${event.project}');
+    debugPrint('[PeonForge] _onTaskComplete: charId=$charId project=${event.project} type=${event.type}');
 
     // Resolve character — use event's character, fallback to avatar, fallback to faction
     GameCharacter? char;
@@ -181,6 +182,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _onPermissionRequest(AppEvent event) async {
     final payload = jsonEncode({'sessionId': event.sessionId, 'project': event.project});
     final provider = context.read<PeonForgeProvider>();
+    debugPrint('[PeonForge] _onPermissionRequest: project=${event.project}');
 
     final charId = event.characterId;
     GameCharacter? char;
