@@ -93,17 +93,24 @@ class AppEvent {
   final String project;
   final String? sessionId;
   final String? characterId; // pack id of the session's character
+  final String? soundPack;   // voice line pack name
+  final String? soundFile;   // voice line filename
   final int timestamp;
 
-  AppEvent({required this.type, required this.project, this.sessionId, this.characterId, required this.timestamp});
+  AppEvent({required this.type, required this.project, this.sessionId, this.characterId, this.soundPack, this.soundFile, required this.timestamp});
 
-  factory AppEvent.fromJson(Map<String, dynamic> json) => AppEvent(
-    type: json['type'] ?? '',
-    project: json['project'] ?? 'Projet',
-    sessionId: json['sessionId'],
-    characterId: (json['character'] is Map) ? json['character']['id'] : null,
-    timestamp: json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
-  );
+  factory AppEvent.fromJson(Map<String, dynamic> json) {
+    final voiceLine = json['voiceLine'];
+    return AppEvent(
+      type: json['type'] ?? '',
+      project: json['project'] ?? 'Projet',
+      sessionId: json['sessionId'],
+      characterId: (json['character'] is Map) ? json['character']['id'] : null,
+      soundPack: (voiceLine is Map) ? voiceLine['pack'] : null,
+      soundFile: (voiceLine is Map) ? voiceLine['file'] : null,
+      timestamp: json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+    );
+  }
 
   static const Map<String, EventMeta> meta = {
     'SessionStart':       EventMeta('▶', 'Session demarree', Color(0xFF64C8FF)),

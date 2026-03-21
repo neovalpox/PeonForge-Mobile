@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -173,12 +174,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           importance: Importance.high,
           priority: Priority.high,
           largeIcon: largeIcon,
+          playSound: false, // we play sound ourselves
         ).toNotificationDetails(),
         payload: payload,
       );
     } catch (e) {
       debugPrint('[PeonForge] Notification error: $e');
     }
+
+    // Play character voice line
+    _playVoiceLine(event);
   }
 
   Future<void> _onPermissionRequest(AppEvent event) async {
@@ -215,11 +220,45 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           importance: Importance.max,
           priority: Priority.max,
           largeIcon: largeIcon,
+          playSound: false,
         ).toNotificationDetails(),
         payload: payload,
       );
     } catch (e) {
       debugPrint('[PeonForge] Permission notification error: $e');
+    }
+
+    _playVoiceLine(event);
+  }
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  Future<void> _playVoiceLine(AppEvent event) async {
+    if (event.soundPack == null || event.soundFile == null) return;
+    final provider = context.read<PeonForgeProvider>();
+    final ip = provider.serverIp;
+    final tunnel = provider.tunnelUrl;
+    final token = provider.authToken;
+
+    // Build sound URL — try LAN first, then tunnel
+    final urls = <String>[];
+    final tokenParam = token != null ? '?token=$token' : '';
+    if (ip != null) urls.add('http://$ip:${provider.port}/sound/${event.soundPack}/${event.soundFile}$tokenParam');
+    if (tunnel != null) {
+      final httpTunnel = tunnel.replaceFirst('wss://', 'https://').replaceFirst('ws://', 'http://');
+      urls.add('$httpTunnel/sound/${event.soundPack}/${event.soundFile}');
+    }
+
+    for (final url in urls) {
+      try {
+        debugPrint('[PeonForge] Playing sound: $url');
+        await _audioPlayer.setUrl(url);
+        await _audioPlayer.setVolume(provider.config.volume);
+        await _audioPlayer.play();
+        return;
+      } catch (e) {
+        debugPrint('[PeonForge] Sound play error: $e');
+      }
     }
   }
 
