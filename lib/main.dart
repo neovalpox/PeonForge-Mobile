@@ -162,21 +162,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     String title = isOrc ? 'Zug zug !' : 'Travail termine !';
     if (char != null) title = '${char.name} : Travail termine !';
 
-    _notifs.show(
-      event.timestamp ~/ 1000,
-      title,
-      'Claude a fini sur ${event.project}',
-      AndroidNotificationDetails(
-        'peonforge_tasks', 'Taches',
-        channelDescription: 'Notifications de taches terminees',
-        importance: Importance.high,
-        priority: Priority.high,
-        sound: RawResourceAndroidNotificationSound(isOrc ? 'peon_complete' : 'task_complete'),
-        playSound: true,
-        largeIcon: largeIcon,
-      ).toNotificationDetails(),
-      payload: payload,
-    );
+    try {
+      await _notifs.show(
+        event.timestamp ~/ 1000,
+        title,
+        'Claude a fini sur ${event.project}',
+        AndroidNotificationDetails(
+          'peonforge_tasks', 'Taches',
+          channelDescription: 'Notifications de taches terminees',
+          importance: Importance.high,
+          priority: Priority.high,
+          largeIcon: largeIcon,
+        ).toNotificationDetails(),
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('[PeonForge] Notification error: $e');
+    }
   }
 
   Future<void> _onPermissionRequest(AppEvent event) async {
@@ -203,21 +205,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     String title = isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise';
     if (char != null) title = '${char.name} : Permission requise';
 
-    _notifs.show(
-      event.timestamp ~/ 1000 + 1,
-      title,
-      '${event.project} attend une reponse',
-      AndroidNotificationDetails(
-        'peonforge_perms', 'Permissions',
-        channelDescription: 'Demandes de permission',
-        importance: Importance.max,
-        priority: Priority.max,
-        sound: RawResourceAndroidNotificationSound(isOrc ? 'peon_question' : 'permission_required'),
-        playSound: true,
-        largeIcon: largeIcon,
-      ).toNotificationDetails(),
-      payload: payload,
-    );
+    try {
+      await _notifs.show(
+        event.timestamp ~/ 1000 + 1,
+        title,
+        '${event.project} attend une reponse',
+        AndroidNotificationDetails(
+          'peonforge_perms', 'Permissions',
+          channelDescription: 'Demandes de permission',
+          importance: Importance.max,
+          priority: Priority.max,
+          largeIcon: largeIcon,
+        ).toNotificationDetails(),
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('[PeonForge] Permission notification error: $e');
+    }
   }
 
   Future<AndroidBitmap<Object>?> _getCharacterIcon(String charId) async {
