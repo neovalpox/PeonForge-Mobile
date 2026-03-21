@@ -15,6 +15,7 @@ class PeonForgeProvider extends ChangeNotifier {
   StreamSubscription? _stateSub;
   StreamSubscription? _connSub;
   StreamSubscription<int>? _stepSub;
+  Timer? _stepPollTimer;
   int dailySteps = 0;
   String _stepsDate = '';
   int _stepBaseline = 0; // pedometer total at midnight reset
@@ -51,7 +52,7 @@ class PeonForgeProvider extends ChangeNotifier {
   }
 
   void _initPedometer() async {
-    _loadStepState();
+    await _loadStepState();
 
     // Request ACTIVITY_RECOGNITION permission (required on Android 10+)
     if (Platform.isAndroid) {
@@ -63,9 +64,42 @@ class PeonForgeProvider extends ChangeNotifier {
       }
     }
 
+    // Get today's steps immediately (don't wait for a step to be taken)
+    try {
+      final now = DateTime.now();
+      final midnight = DateTime(now.year, now.month, now.day);
+      final todaySteps = await _pedometer.getStepCount(from: midnight, to: now);
+      debugPrint('[PeonForge] Initial step count today: $todaySteps');
+      if (todaySteps > 0) {
+        dailySteps = todaySteps;
+        _stepBaseline = -1; // mark as using getStepCount, not stream baseline
+        _sendSteps();
+      }
+    } catch (e) {
+      debugPrint('[PeonForge] getStepCount error: $e');
+    }
+
+    // Listen for live step updates
     _stepSub = _pedometer.stepCountStream().listen(_onStepCount, onError: (e) {
-      debugPrint('[PeonForge] Pedometer error: $e');
+      debugPrint('[PeonForge] Pedometer stream error: $e');
     });
+
+    // Poll every 60s as fallback (some devices don't fire the stream reliably)
+    _stepPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => _pollSteps());
+  }
+
+  Future<void> _pollSteps() async {
+    try {
+      final now = DateTime.now();
+      final midnight = DateTime(now.year, now.month, now.day);
+      final todaySteps = await _pedometer.getStepCount(from: midnight, to: now);
+      if (todaySteps > dailySteps) {
+        dailySteps = todaySteps;
+        _stepBaseline = -1;
+        _sendSteps();
+        debugPrint('[PeonForge] Poll steps: $todaySteps');
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadStepState() async {
@@ -86,29 +120,35 @@ class PeonForgeProvider extends ChangeNotifier {
 
   void _onStepCount(int totalSteps) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
+    debugPrint('[PeonForge] Step stream event: $totalSteps (baseline=$_stepBaseline)');
 
     if (_stepsDate != today) {
-      // Day changed — reset baseline to current total
       _stepBaseline = totalSteps;
       dailySteps = 0;
       _stepsDate = today;
     }
 
-    if (_stepBaseline == 0) {
-      // First reading: set baseline so daily starts from 0
+    if (_stepBaseline <= 0) {
+      // First stream reading: set baseline so daily count matches getStepCount
       _stepBaseline = totalSteps - dailySteps;
+      if (_stepBaseline < 0) _stepBaseline = 0;
     }
 
     dailySteps = totalSteps - _stepBaseline;
     if (dailySteps < 0) dailySteps = 0;
 
-    // Persist locally
+    _sendSteps();
+  }
+
+  void _sendSteps() async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    _stepsDate = today;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('daily_steps', dailySteps);
     await prefs.setInt('step_baseline', _stepBaseline);
     await prefs.setString('steps_date', today);
 
-    // Send to server
     _connection.send({'type': 'set-steps', 'steps': dailySteps});
     notifyListeners();
   }
@@ -394,6 +434,7 @@ class PeonForgeProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stepPollTimer?.cancel();
     _stepSub?.cancel();
     _stateSub?.cancel();
     _connSub?.cancel();
