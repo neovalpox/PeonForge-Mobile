@@ -36,8 +36,9 @@ class Session {
   final SessionCharacter character;
   final int startTime;
   final int eventCount;
+  final int lastEventTime;
 
-  Session({required this.id, required this.project, required this.character, required this.startTime, required this.eventCount});
+  Session({required this.id, required this.project, required this.character, required this.startTime, required this.eventCount, required this.lastEventTime});
 
   factory Session.fromJson(Map<String, dynamic> json) => Session(
     id: json['id'] ?? '',
@@ -45,9 +46,11 @@ class Session {
     character: SessionCharacter.fromJson(json['character'] ?? {}),
     startTime: json['startTime'] ?? DateTime.now().millisecondsSinceEpoch,
     eventCount: json['eventCount'] ?? 0,
+    lastEventTime: json['lastEventTime'] ?? json['startTime'] ?? DateTime.now().millisecondsSinceEpoch,
   );
 
   Duration get elapsed => Duration(milliseconds: DateTime.now().millisecondsSinceEpoch - startTime);
+  bool get isIdle => (DateTime.now().millisecondsSinceEpoch - lastEventTime) > 120000; // >2min
 }
 
 class TamagotchiState {

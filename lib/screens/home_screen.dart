@@ -274,17 +274,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final m = elapsed.inMinutes;
     final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
     final color = s.character.parsedColor;
+    final idle = s.isIdle;
 
-    return GestureDetector(
-      onTap: () => p.focusTerminal(sessionId: s.id, project: s.project),
+    return Opacity(
+      opacity: idle ? 0.5 : 1.0,
       child: Container(
         width: 140, margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: WC3Colors.bgCard, borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.3))),
+        decoration: BoxDecoration(
+          color: idle ? WC3Colors.bgCard : WC3Colors.bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: idle ? color.withValues(alpha: 0.15) : color.withValues(alpha: 0.4)),
+          boxShadow: idle ? null : [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 8)],
+        ),
         child: Row(
           children: [
             Container(
               width: 36, height: 36,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: color, width: 1.5)),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: idle ? color.withValues(alpha: 0.3) : color, width: 1.5),
+                boxShadow: idle ? null : [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 6)],
+              ),
               child: ClipRRect(borderRadius: BorderRadius.circular(5),
                 child: s.character.isLocal
                     ? Image.asset(s.character.assetPath, fit: BoxFit.cover)
@@ -299,9 +309,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   Text(s.project, style: const TextStyle(color: WC3Colors.goldText, fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Row(children: [
-                    Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: WC3Colors.green.withValues(alpha: 0.8))),
+                    Container(width: 5, height: 5, decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: idle ? WC3Colors.goldDark.withValues(alpha: 0.4) : WC3Colors.green.withValues(alpha: 0.8),
+                    )),
                     const SizedBox(width: 4),
-                    Text('$m:$ss', style: const TextStyle(color: WC3Colors.textDim, fontSize: 10)),
+                    Text(idle ? '$m:$ss (idle)' : '$m:$ss', style: const TextStyle(color: WC3Colors.textDim, fontSize: 10)),
                   ]),
                 ],
               ),
