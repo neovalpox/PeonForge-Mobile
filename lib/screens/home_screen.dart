@@ -159,11 +159,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 12),
                 _buildStepCounter(p, tama),
 
-                // Usage stats
-                if (tama.usage.todayCost > 0 || tama.usage.weekCost > 0)
+                // Usage stats — compact
+                if (tama.usage.todayTokens > 0)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: _buildUsageWidget(tama.usage),
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.bolt, color: WC3Colors.blue, size: 14),
+                        const SizedBox(width: 4),
+                        Text('${_fmtTokens(tama.usage.todayTokens)} aujourd\'hui', style: const TextStyle(color: WC3Colors.blue, fontSize: 10, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Text('${_fmtTokens(tama.usage.monthTokens)} ce mois', style: const TextStyle(color: WC3Colors.textDim, fontSize: 9)),
+                      ],
+                    ),
                   ),
               ],
             ),
