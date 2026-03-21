@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -252,9 +252,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     for (final url in urls) {
       try {
         debugPrint('[PeonForge] Playing sound: $url');
-        await _audioPlayer.setUrl(url);
         await _audioPlayer.setVolume(provider.config.volume);
-        await _audioPlayer.play();
+        await _audioPlayer.play(UrlSource(url));
         return;
       } catch (e) {
         debugPrint('[PeonForge] Sound play error: $e');
