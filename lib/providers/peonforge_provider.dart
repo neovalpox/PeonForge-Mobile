@@ -2,24 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
-
-const _stepChannel = MethodChannel('com.peonforge/steps');
-const _stepStream = EventChannel('com.peonforge/step_stream');
 
 class PeonForgeProvider extends ChangeNotifier {
   final ConnectionService _connection = ConnectionService();
   StreamSubscription? _stateSub;
   StreamSubscription? _connSub;
-  StreamSubscription? _stepSub;
   Timer? _stepPollTimer;
   int dailySteps = 0;
-  String _stepsDate = '';
-  int _stepBaseline = 0; // pedometer total at midnight reset
 
   bool connected = false;
   String? serverIp;
@@ -53,83 +46,51 @@ class PeonForgeProvider extends ChangeNotifier {
   }
 
   void _initPedometer() async {
-    await _loadStepState();
-
     if (!Platform.isAndroid) return;
 
-    // Request ACTIVITY_RECOGNITION permission (required on Android 10+)
+    final health = Health();
+
+    // Configure Health Connect
+    Health().configure();
+
+    // Request Health Connect authorization for steps
     try {
-      final status = await Permission.activityRecognition.request()
-          .timeout(const Duration(seconds: 3), onTimeout: () => PermissionStatus.granted);
-      debugPrint('[PeonForge] Activity recognition permission: $status');
-      if (status.isDenied || status.isPermanentlyDenied) {
-        debugPrint('[PeonForge] Pedometer permission denied');
-        // Don't return — try anyway, permission might already be granted
+      final types = [HealthDataType.STEPS];
+      final permissions = [HealthDataAccess.READ];
+      final authorized = await health.requestAuthorization(types, permissions: permissions);
+      debugPrint('[PeonForge] Health Connect authorized: $authorized');
+      if (!authorized) {
+        debugPrint('[PeonForge] Health Connect permission denied');
+        return;
       }
     } catch (e) {
-      debugPrint('[PeonForge] Permission request error: $e');
-    }
-
-    // Check if sensor is available
-    try {
-      final hasSensor = await _stepChannel.invokeMethod<bool>('hasSensor') ?? false;
-      debugPrint('[PeonForge] Step sensor available: $hasSensor');
-      if (!hasSensor) return;
-
-      // Load saved steps for today immediately
-      final savedSteps = await _stepChannel.invokeMethod<int>('getStepCount') ?? 0;
-      if (savedSteps > 0) {
-        dailySteps = savedSteps;
-        debugPrint('[PeonForge] Loaded saved steps: $savedSteps');
-        _sendSteps();
-      }
-    } catch (e) {
-      debugPrint('[PeonForge] Step sensor check error: $e');
+      debugPrint('[PeonForge] Health Connect auth error: $e');
       return;
     }
 
-    // Small delay to ensure permission is fully propagated to SensorService
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Fetch today's steps immediately
+    await _fetchSteps(health);
 
-    // Listen for live step updates from native sensor (daily steps directly)
-    debugPrint('[PeonForge] Starting step stream listener...');
-    _stepSub = _stepStream.receiveBroadcastStream().listen((event) {
-      final steps = event as int;
-      if (steps != dailySteps) {
-        debugPrint('[PeonForge] Steps updated: $steps');
+    // Poll every 60s to keep step count updated (Health Connect has the data even when app is closed)
+    _stepPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => _fetchSteps(health));
+  }
+
+  Future<void> _fetchSteps(Health health) async {
+    try {
+      final now = DateTime.now();
+      final midnight = DateTime(now.year, now.month, now.day);
+      final steps = await health.getTotalStepsInInterval(midnight, now);
+      debugPrint('[PeonForge] Health Connect steps today: $steps');
+      if (steps != null && steps != dailySteps) {
         dailySteps = steps;
         _sendSteps();
       }
-    }, onError: (e) {
-      debugPrint('[PeonForge] Step stream error: $e');
-    });
-  }
-
-  Future<void> _loadStepState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    final savedDate = prefs.getString('steps_date') ?? '';
-    if (savedDate == today) {
-      dailySteps = prefs.getInt('daily_steps') ?? 0;
-      _stepBaseline = prefs.getInt('step_baseline') ?? 0;
-    } else {
-      // New day — reset
-      dailySteps = 0;
-      _stepBaseline = 0;
-      _stepsDate = today;
+    } catch (e) {
+      debugPrint('[PeonForge] Health Connect fetch error: $e');
     }
-    _stepsDate = today;
   }
 
-  void _sendSteps() async {
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    _stepsDate = today;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('daily_steps', dailySteps);
-    await prefs.setInt('step_baseline', _stepBaseline);
-    await prefs.setString('steps_date', today);
-
+  void _sendSteps() {
     _connection.send({'type': 'set-steps', 'steps': dailySteps});
     notifyListeners();
   }
@@ -416,7 +377,6 @@ class PeonForgeProvider extends ChangeNotifier {
   @override
   void dispose() {
     _stepPollTimer?.cancel();
-    _stepSub?.cancel();
     _stateSub?.cancel();
     _connSub?.cancel();
     _connection.dispose();
