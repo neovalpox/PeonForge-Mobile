@@ -141,7 +141,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final provider = context.read<PeonForgeProvider>();
 
     final charId = event.characterId;
-    debugPrint('[PeonForge] _onTaskComplete: charId=$charId project=${event.project} type=${event.type}');
+    debugPrint('[PeonForge] _onTaskComplete: charId=$charId project=${event.project} type=${event.type} avatar=${provider.avatar}');
 
     // Resolve character — use event's character, fallback to avatar, fallback to faction
     GameCharacter? char;
@@ -157,6 +157,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final iconId = char?.id ?? charId;
     if (iconId != null && iconId.isNotEmpty) {
       largeIcon = await _getCharacterIcon(iconId);
+      debugPrint('[PeonForge] Notification icon: $iconId, loaded=${largeIcon != null}');
     }
 
     String title = isOrc ? 'Zug zug !' : 'Travail termine !';
