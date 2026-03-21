@@ -160,10 +160,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       debugPrint('[PeonForge] Notification icon: $iconId, loaded=${largeIcon != null}');
     }
 
-    final charName = char?.name ?? (isOrc ? 'Peon' : 'Paysan');
-    final title = isOrc
-        ? '$charName a fini, chef !'
-        : '$charName a termine son travail !';
+    final title = isOrc ? 'Zug zug !' : 'Travail termine !';
 
     try {
       await _notifs.show(
@@ -205,10 +202,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       largeIcon = await _getCharacterIcon(iconId);
     }
 
-    final charName = char?.name ?? (isOrc ? 'Peon' : 'Paysan');
-    final title = isOrc
-        ? '$charName a besoin d\'ordres !'
-        : '$charName attend vos instructions !';
+    final title = isOrc ? 'Chef ? Quoi faire ?' : 'Permission requise !';
 
     try {
       await _notifs.show(
@@ -231,18 +225,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<AndroidBitmap<Object>?> _getCharacterIcon(String charId) async {
     try {
+      // Check local cache first
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/notif_icon_$charId.png');
+      if (await file.exists() && await file.length() > 100) {
+        debugPrint('[PeonForge] Icon from cache: ${file.path}');
+        return FilePathAndroidBitmap(file.path);
+      }
+
       final url = 'https://peonforge.ch/assets/icons/$charId.png';
+      debugPrint('[PeonForge] Downloading icon: $url');
       final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
       final req = await client.getUrl(Uri.parse(url));
       final res = await req.close().timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final bytes = await consolidateHttpClientResponseBytes(res);
-        // Save to temp file for notification
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/notif_icon_$charId.png');
         await file.writeAsBytes(bytes);
+        debugPrint('[PeonForge] Icon saved: ${file.path} (${bytes.length} bytes)');
+        client.close(force: true);
         return FilePathAndroidBitmap(file.path);
       }
+      debugPrint('[PeonForge] Icon download failed: ${res.statusCode}');
       client.close(force: true);
     } catch (_) {}
     return null;
