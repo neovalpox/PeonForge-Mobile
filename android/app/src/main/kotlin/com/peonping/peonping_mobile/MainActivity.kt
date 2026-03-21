@@ -143,8 +143,21 @@ class MainActivity : FlutterActivity(), SensorEventListener {
 
     private fun registerStepListener() {
         stepSensor?.let {
-            val ok = sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            val ok = sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
             android.util.Log.i("PeonForge", "Step sensor registered: $ok")
+            // Force a flush to get an immediate reading
+            if (ok == true) sensorManager?.flush(this)
+            // Send saved daily steps immediately so UI shows something before first step
+            val prefs = getSharedPreferences("peonforge_steps", Context.MODE_PRIVATE)
+            val savedDate = prefs.getString("date", "") ?: ""
+            val today = java.time.LocalDate.now().toString()
+            if (savedDate == today) {
+                val saved = prefs.getInt("daily", 0)
+                if (saved > 0) {
+                    android.util.Log.i("PeonForge", "Sending saved steps: $saved")
+                    eventSink?.success(saved)
+                }
+            }
         } ?: android.util.Log.e("PeonForge", "No step counter sensor")
     }
 
