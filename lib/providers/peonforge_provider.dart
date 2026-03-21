@@ -58,11 +58,16 @@ class PeonForgeProvider extends ChangeNotifier {
     if (!Platform.isAndroid) return;
 
     // Request ACTIVITY_RECOGNITION permission (required on Android 10+)
-    final status = await Permission.activityRecognition.request();
-    debugPrint('[PeonForge] Activity recognition permission: $status');
-    if (!status.isGranted) {
-      debugPrint('[PeonForge] Pedometer permission denied');
-      return;
+    try {
+      final status = await Permission.activityRecognition.request()
+          .timeout(const Duration(seconds: 3), onTimeout: () => PermissionStatus.granted);
+      debugPrint('[PeonForge] Activity recognition permission: $status');
+      if (status.isDenied || status.isPermanentlyDenied) {
+        debugPrint('[PeonForge] Pedometer permission denied');
+        // Don't return — try anyway, permission might already be granted
+      }
+    } catch (e) {
+      debugPrint('[PeonForge] Permission request error: $e');
     }
 
     // Check if sensor is available
@@ -70,16 +75,28 @@ class PeonForgeProvider extends ChangeNotifier {
       final hasSensor = await _stepChannel.invokeMethod<bool>('hasSensor') ?? false;
       debugPrint('[PeonForge] Step sensor available: $hasSensor');
       if (!hasSensor) return;
+
+      // Load saved steps for today immediately
+      final savedSteps = await _stepChannel.invokeMethod<int>('getStepCount') ?? 0;
+      if (savedSteps > 0) {
+        dailySteps = savedSteps;
+        debugPrint('[PeonForge] Loaded saved steps: $savedSteps');
+        _sendSteps();
+      }
     } catch (e) {
       debugPrint('[PeonForge] Step sensor check error: $e');
       return;
     }
 
+    // Small delay to ensure permission is fully propagated to SensorService
+    await Future.delayed(const Duration(milliseconds: 500));
+
     // Listen for live step updates from native sensor (daily steps directly)
+    debugPrint('[PeonForge] Starting step stream listener...');
     _stepSub = _stepStream.receiveBroadcastStream().listen((event) {
       final steps = event as int;
-      debugPrint('[PeonForge] Native step event: $steps daily steps');
-      if (steps > dailySteps || dailySteps == 0) {
+      if (steps != dailySteps) {
+        debugPrint('[PeonForge] Steps updated: $steps');
         dailySteps = steps;
         _sendSteps();
       }

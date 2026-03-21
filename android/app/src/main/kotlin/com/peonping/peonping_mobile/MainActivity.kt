@@ -1,7 +1,9 @@
 package com.peonping.peonping_mobile
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -10,6 +12,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -50,7 +54,11 @@ class MainActivity : FlutterActivity(), SensorEventListener {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getStepCount" -> {
-                        result.success(lastStepCount.toInt())
+                        val p = getSharedPreferences("peonforge_steps", Context.MODE_PRIVATE)
+                        val savedDate = p.getString("date", "") ?: ""
+                        val today = java.time.LocalDate.now().toString()
+                        val steps = if (savedDate == today) p.getInt("daily", 0) else 0
+                        result.success(steps)
                     }
                     "hasSensor" -> {
                         result.success(stepSensor != null)
@@ -64,9 +72,18 @@ class MainActivity : FlutterActivity(), SensorEventListener {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     eventSink = events
-                    stepSensor?.let {
-                        sensorManager?.registerListener(this@MainActivity, it, SensorManager.SENSOR_DELAY_UI)
-                    } ?: events?.error("NO_SENSOR", "Step counter sensor not available", null)
+
+                    // Request ACTIVITY_RECOGNITION permission at native level
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        if (ContextCompat.checkSelfPermission(this@MainActivity,
+                                Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                            ActivityCompat.requestPermissions(this@MainActivity,
+                                arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1001)
+                            // Listener will be registered in onRequestPermissionsResult
+                            return
+                        }
+                    }
+                    registerStepListener()
                 }
                 override fun onCancel(arguments: Any?) {
                     sensorManager?.unregisterListener(this@MainActivity)
@@ -74,40 +91,67 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                 }
             })
 
-        // Load saved daily offset
+        // Load saved daily steps
         val prefs = getSharedPreferences("peonforge_steps", Context.MODE_PRIVATE)
         val savedDate = prefs.getString("date", "") ?: ""
         val today = java.time.LocalDate.now().toString()
         if (savedDate == today) {
-            dailyStepOffset = prefs.getInt("offset", 0)
+            dailyStepOffset = prefs.getInt("daily", 0)
         }
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
-            lastStepCount = event.values[0]
+            val currentTotal = event.values[0]
+            lastStepCount = currentTotal
+            val prefs = getSharedPreferences("peonforge_steps", Context.MODE_PRIVATE)
+            val today = java.time.LocalDate.now().toString()
+            val savedDate = prefs.getString("date", "") ?: ""
 
-            // Track daily steps
-            if (initialStepCount < 0) {
-                val prefs = getSharedPreferences("peonforge_steps", Context.MODE_PRIVATE)
-                val savedDate = prefs.getString("date", "") ?: ""
-                val today = java.time.LocalDate.now().toString()
-                if (savedDate == today) {
-                    initialStepCount = prefs.getFloat("initial", lastStepCount)
-                } else {
-                    initialStepCount = lastStepCount
+            if (savedDate != today) {
+                // New day: save current total as baseline, carry over accumulated daily steps
+                val prevDaily = prefs.getInt("daily", 0)
+                initialStepCount = currentTotal
+                dailyStepOffset = 0
+                prefs.edit()
+                    .putString("date", today)
+                    .putFloat("initial", initialStepCount)
+                    .putInt("daily", 0)
+                    .apply()
+            } else if (initialStepCount < 0) {
+                // App restart same day: restore baseline
+                initialStepCount = prefs.getFloat("initial", currentTotal)
+                dailyStepOffset = prefs.getInt("daily", 0)
+                // If device rebooted (currentTotal < initialStepCount), adjust
+                if (currentTotal < initialStepCount) {
+                    dailyStepOffset += (initialStepCount - currentTotal).toInt()
+                    initialStepCount = currentTotal
                     prefs.edit()
-                        .putString("date", today)
                         .putFloat("initial", initialStepCount)
-                        .putInt("offset", 0)
+                        .putInt("daily", dailyStepOffset)
                         .apply()
                 }
             }
 
-            val dailySteps = (lastStepCount - initialStepCount).toInt()
+            val dailySteps = (currentTotal - initialStepCount).toInt() + dailyStepOffset
+            prefs.edit().putInt("daily", dailySteps).apply()
             eventSink?.success(dailySteps)
         }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun registerStepListener() {
+        stepSensor?.let {
+            val ok = sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            android.util.Log.i("PeonForge", "Step sensor registered: $ok")
+        } ?: android.util.Log.e("PeonForge", "No step counter sensor")
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            registerStepListener()
+        }
+    }
 }
