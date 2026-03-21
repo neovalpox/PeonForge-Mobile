@@ -117,6 +117,11 @@ class PeonForgeProvider extends ChangeNotifier {
       port = savedPort;
       _connection.connect(savedIp, port: savedPort, tunnelFallback: savedTunnel, authToken: authToken);
       notifyListeners();
+    } else if (savedTunnel != null && savedTunnel.isNotEmpty) {
+      tunnelUrl = savedTunnel;
+      port = savedPort;
+      _connection.connect(savedTunnel, isTunnel: true, port: savedPort, authToken: authToken);
+      notifyListeners();
     }
   }
 
@@ -147,6 +152,8 @@ class PeonForgeProvider extends ChangeNotifier {
   void reconnect() {
     if (serverIp != null) {
       _connection.connect(serverIp!, port: port, tunnelFallback: tunnelUrl, authToken: authToken);
+    } else if (tunnelUrl != null) {
+      _connection.connect(tunnelUrl!, isTunnel: true, port: port, authToken: authToken);
     }
   }
 

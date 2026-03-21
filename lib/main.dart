@@ -90,7 +90,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     // Reconnect WebSocket when app comes back to foreground
     if (state == AppLifecycleState.resumed) {
       final provider = context.read<PeonForgeProvider>();
-      if (!provider.connected && provider.serverIp != null) {
+      if (!provider.connected && (provider.serverIp != null || provider.tunnelUrl != null)) {
         provider.reconnect();
       }
     }
