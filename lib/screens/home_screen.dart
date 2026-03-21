@@ -158,6 +158,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 // Step counter / happiness
                 const SizedBox(height: 12),
                 _buildStepCounter(p, tama),
+
+                // Usage stats
+                if (tama.usage.todayCost > 0 || tama.usage.weekCost > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _buildUsageWidget(tama.usage),
+                  ),
               ],
             ),
           ),
@@ -288,6 +295,45 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUsageWidget(UsageStats usage) {
+    Widget bar(String label, double cost, double budget, Color color) {
+      final pct = (cost / budget).clamp(0.0, 1.0);
+      final barColor = pct >= 0.8 ? WC3Colors.red : pct >= 0.5 ? WC3Colors.goldLight : color;
+      return Row(
+        children: [
+          SizedBox(width: 14, child: Text(label, style: TextStyle(color: barColor, fontSize: 8, fontWeight: FontWeight.w700))),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(value: pct, minHeight: 3, backgroundColor: WC3Colors.bgSurface, valueColor: AlwaysStoppedAnimation(barColor)),
+            ),
+          ),
+          SizedBox(width: 32, child: Text('\$${cost.toStringAsFixed(0)}', textAlign: TextAlign.right, style: TextStyle(color: barColor, fontSize: 8))),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.bolt, color: WC3Colors.blue, size: 14),
+            const SizedBox(width: 4),
+            Text('\$${usage.todayCost.toStringAsFixed(2)} aujourd\'hui', style: const TextStyle(color: WC3Colors.blue, fontSize: 11, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            Text('${usage.todayTokens >= 1e6 ? "${(usage.todayTokens / 1e6).toStringAsFixed(1)}M" : "${(usage.todayTokens / 1e3).round()}K"} tokens',
+              style: const TextStyle(color: WC3Colors.textDim, fontSize: 9)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        bar('J', usage.todayCost, 50, WC3Colors.blue),
+        const SizedBox(height: 2),
+        bar('S', usage.weekCost, 200, WC3Colors.purple),
+        const SizedBox(height: 2),
+        bar('M', usage.monthCost, 500, WC3Colors.goldLight),
+      ],
     );
   }
 

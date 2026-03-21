@@ -55,6 +55,22 @@ class Session {
   bool get isIdle => eventCount > 0 && (DateTime.now().millisecondsSinceEpoch - lastEventTime) > 120000;
 }
 
+class UsageStats {
+  final double todayCost, weekCost, monthCost;
+  final int todayTokens, weekTokens, monthTokens;
+
+  UsageStats({this.todayCost = 0, this.weekCost = 0, this.monthCost = 0, this.todayTokens = 0, this.weekTokens = 0, this.monthTokens = 0});
+
+  factory UsageStats.fromJson(Map<String, dynamic> json) => UsageStats(
+    todayCost: (json['todayCost'] ?? 0).toDouble(),
+    weekCost: (json['weekCost'] ?? 0).toDouble(),
+    monthCost: (json['monthCost'] ?? 0).toDouble(),
+    todayTokens: json['todayTokens'] ?? 0,
+    weekTokens: json['weekTokens'] ?? 0,
+    monthTokens: json['monthTokens'] ?? 0,
+  );
+}
+
 class TamagotchiState {
   final int xp, gold, level, xpInLevel, xpForLevel, tasksCompleted, totalWorkTime;
   final int happiness; // 0-100
@@ -62,6 +78,7 @@ class TamagotchiState {
   final int lastFed;   // timestamp
   final int lastPet;   // timestamp
   final bool xpBoost;  // training active
+  final UsageStats usage;
 
   TamagotchiState({
     this.xp = 0, this.gold = 0, this.level = 1,
@@ -69,7 +86,8 @@ class TamagotchiState {
     this.tasksCompleted = 0, this.totalWorkTime = 0,
     this.happiness = 50, this.dailySteps = 0,
     this.lastFed = 0, this.lastPet = 0, this.xpBoost = false,
-  });
+    UsageStats? usage,
+  }) : usage = usage ?? UsageStats();
 
   factory TamagotchiState.fromJson(Map<String, dynamic> json) => TamagotchiState(
     xp: json['xp'] ?? 0,
@@ -84,6 +102,7 @@ class TamagotchiState {
     lastFed: json['lastFed'] ?? 0,
     lastPet: json['lastPet'] ?? 0,
     xpBoost: json['xpBoost'] ?? false,
+    usage: json['usage'] is Map ? UsageStats.fromJson(json['usage']) : null,
   );
 
   double get xpProgress => xpForLevel > 0 ? xpInLevel / xpForLevel : 0;
