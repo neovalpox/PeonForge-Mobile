@@ -268,6 +268,141 @@ class DailyStats {
   );
 }
 
+class Duel {
+  final String id;
+  final String challenger;
+  final String challenged;
+  final String stat; // tasks, steps, xp
+  final String status; // pending, active, completed
+  final String? winner;
+  final int challengerScore;
+  final int challengedScore;
+  final int createdAt;
+  final int? endsAt;
+
+  Duel({
+    required this.id,
+    required this.challenger,
+    required this.challenged,
+    required this.stat,
+    this.status = 'pending',
+    this.winner,
+    this.challengerScore = 0,
+    this.challengedScore = 0,
+    required this.createdAt,
+    this.endsAt,
+  });
+
+  factory Duel.fromJson(Map<String, dynamic> json) => Duel(
+    id: json['id'] ?? '',
+    challenger: json['challenger'] ?? '',
+    challenged: json['challenged'] ?? '',
+    stat: json['stat'] ?? 'tasks',
+    status: json['status'] ?? 'pending',
+    winner: json['winner'],
+    challengerScore: json['challengerScore'] ?? 0,
+    challengedScore: json['challengedScore'] ?? 0,
+    createdAt: json['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+    endsAt: json['endsAt'],
+  );
+
+  String get statLabel {
+    switch (stat) {
+      case 'tasks': return 'Taches';
+      case 'steps': return 'Pas';
+      case 'xp': return 'XP';
+      default: return stat;
+    }
+  }
+
+  Color get statusColor {
+    switch (status) {
+      case 'pending': return const Color(0xFFFFC832);
+      case 'active': return const Color(0xFF64C8FF);
+      case 'completed': return const Color(0xFF5AFF5A);
+      default: return const Color(0xFFC8B88A);
+    }
+  }
+
+  String get statusLabel {
+    switch (status) {
+      case 'pending': return 'En attente';
+      case 'active': return 'En cours';
+      case 'completed': return 'Termine';
+      default: return status;
+    }
+  }
+}
+
+class Guild {
+  final String id;
+  final String name;
+  final String tag;
+  final String faction;
+  final int memberCount;
+  final List<GuildMember> members;
+  final int totalTasks;
+  final int totalXp;
+  final int totalSteps;
+  final int createdAt;
+
+  Guild({
+    required this.id,
+    required this.name,
+    required this.tag,
+    this.faction = 'human',
+    this.memberCount = 0,
+    this.members = const [],
+    this.totalTasks = 0,
+    this.totalXp = 0,
+    this.totalSteps = 0,
+    required this.createdAt,
+  });
+
+  factory Guild.fromJson(Map<String, dynamic> json) => Guild(
+    id: json['id'] ?? '',
+    name: json['name'] ?? '',
+    tag: json['tag'] ?? '',
+    faction: json['faction'] ?? 'human',
+    memberCount: json['memberCount'] ?? json['members']?.length ?? 0,
+    members: (json['members'] as List?)?.map((m) => GuildMember.fromJson(m)).toList() ?? [],
+    totalTasks: json['totalTasks'] ?? 0,
+    totalXp: json['totalXp'] ?? 0,
+    totalSteps: json['totalSteps'] ?? 0,
+    createdAt: json['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+  );
+
+  Color get factionColor {
+    switch (faction) {
+      case 'orc': return const Color(0xFFFF6644);
+      case 'nightelf': return const Color(0xFFB482FF);
+      case 'undead': return const Color(0xFF5AFF5A);
+      default: return const Color(0xFF64C8FF);
+    }
+  }
+}
+
+class GuildMember {
+  final String username;
+  final int level;
+  final int tasksCompleted;
+  final String role; // leader, member
+
+  GuildMember({
+    required this.username,
+    this.level = 1,
+    this.tasksCompleted = 0,
+    this.role = 'member',
+  });
+
+  factory GuildMember.fromJson(Map<String, dynamic> json) => GuildMember(
+    username: json['username'] ?? '',
+    level: json['level'] ?? 1,
+    tasksCompleted: json['tasksCompleted'] ?? 0,
+    role: json['role'] ?? 'member',
+  );
+}
+
 class PeonForgeConfig {
   final String faction;
   final String side;

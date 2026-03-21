@@ -97,6 +97,33 @@ class I18n {
       'username_title': 'Pseudo',
       'not_enough_gold': 'Pas assez d\'or',
       'already_training': 'Deja en entrainement',
+
+      // Duels
+      'duels': 'Duels',
+      'challenge': 'Defier',
+      'no_duels': 'Aucun duel en cours',
+      'pending': 'En attente',
+      'active': 'En cours',
+      'completed': 'Termine',
+      'victory': 'Victoire !',
+      'defeat': 'Defaite',
+      'pick_opponent': 'Choisis un adversaire',
+      'launch_challenge': 'Lancer un defi',
+      'challenge_type': 'TYPE DE DEFI',
+
+      // Guilds
+      'guilds': 'Guildes',
+      'create_guild': 'Creer une guilde',
+      'join_guild': 'Rejoindre',
+      'leave_guild': 'Quitter la guilde',
+      'leave_confirm': 'Quitter la guilde ?',
+      'guild_name': 'Nom de la guilde',
+      'guild_tag': 'Tag (3 lettres)',
+      'guild_faction': 'FACTION',
+      'guild_members': 'MEMBRES',
+      'guild_stats': 'STATS CUMULEES',
+      'leader': 'Chef',
+      'member': 'Membre',
     },
     'en': {
       'home': 'Home',
@@ -166,6 +193,33 @@ class I18n {
       'username_title': 'Username',
       'not_enough_gold': 'Not enough gold',
       'already_training': 'Already training',
+
+      // Duels
+      'duels': 'Duels',
+      'challenge': 'Challenge',
+      'no_duels': 'No duels yet',
+      'pending': 'Pending',
+      'active': 'Active',
+      'completed': 'Completed',
+      'victory': 'Victory!',
+      'defeat': 'Defeat',
+      'pick_opponent': 'Pick an opponent',
+      'launch_challenge': 'Launch challenge',
+      'challenge_type': 'CHALLENGE TYPE',
+
+      // Guilds
+      'guilds': 'Guilds',
+      'create_guild': 'Create a guild',
+      'join_guild': 'Join',
+      'leave_guild': 'Leave guild',
+      'leave_confirm': 'Leave guild?',
+      'guild_name': 'Guild name',
+      'guild_tag': 'Tag (3 letters)',
+      'guild_faction': 'FACTION',
+      'guild_members': 'MEMBERS',
+      'guild_stats': 'CUMULATIVE STATS',
+      'leader': 'Leader',
+      'member': 'Member',
     },
   };
 }
