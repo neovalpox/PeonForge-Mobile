@@ -16,7 +16,8 @@ class ConnectionService {
   String? _authToken;
   bool _connected = false;
   bool _tryingTunnel = false;
-  bool _tunnelWorked = false; // remember if tunnel connected successfully
+  bool _tunnelWorked = false;
+  int _reconnectAttempts = 0;
 
   Stream<Map<String, dynamic>> get stateStream => _stateController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -82,6 +83,7 @@ class ConnectionService {
 
       if (_tryingTunnel) _tunnelWorked = true;
       _connected = true;
+      _reconnectAttempts = 0;
       _connectionController.add(true);
 
       _channel!.stream.listen(
@@ -120,7 +122,9 @@ class ConnectionService {
     }
     _pingTimer?.cancel();
 
-    // Try LAN first, then tunnel fallback
+    _reconnectAttempts++;
+
+    // First try: LAN failed, try tunnel
     if (!_tryingTunnel && _tunnelUrl != null) {
       _tryingTunnel = true;
       _log('Trying tunnel fallback...');
@@ -129,14 +133,23 @@ class ConnectionService {
       return;
     }
 
-    // Both failed — try fetching latest tunnel URL from peonforge.ch
+    // Both failed — progressive backoff (3s, 5s, 10s, 15s, max 30s)
     _tryingTunnel = false;
-    _log('Both failed, fetching tunnel from server in 5s...');
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-      await _fetchTunnelFromForge();
-      _doConnect();
-    });
+    final delay = (_reconnectAttempts <= 2) ? 3 : (_reconnectAttempts <= 5) ? 10 : 30;
+
+    // Every 3rd attempt, try fetching latest tunnel from peonforge.ch
+    if (_reconnectAttempts % 3 == 0 && _forgeToken != null) {
+      _log('Fetching tunnel from server...');
+      _reconnectTimer?.cancel();
+      _reconnectTimer = Timer(Duration(seconds: delay), () async {
+        await _fetchTunnelFromForge();
+        _doConnect();
+      });
+    } else {
+      _log('Reconnecting in ${delay}s... (attempt $_reconnectAttempts)');
+      _reconnectTimer?.cancel();
+      _reconnectTimer = Timer(Duration(seconds: delay), _doConnect);
+    }
   }
 
   String? _forgeToken;
@@ -151,7 +164,7 @@ class ConnectionService {
       final req = await client.getUrl(url);
       final res = await req.close().timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
-        final body = await res.transform(const SystemEncoding().decoder).join();
+        final body = await res.transform(const Utf8Decoder()).join();
         final data = jsonDecode(body) as Map<String, dynamic>;
         if (data['online'] == true && data['tunnel_url'] != null && (data['tunnel_url'] as String).isNotEmpty) {
           final newTunnel = (data['tunnel_url'] as String)
