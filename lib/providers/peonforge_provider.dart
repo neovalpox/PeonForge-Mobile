@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/connection_service.dart';
@@ -253,6 +254,12 @@ class PeonForgeProvider extends ChangeNotifier {
       return;
     }
 
+    if (type == 'image-saved') {
+      lastImageSavedPath = msg['path'] as String?;
+      notifyListeners();
+      return;
+    }
+
     // Username/avatar/register updates
     if (msg['username'] != null) username = msg['username'] as String;
     if (msg['avatar'] != null) avatar = msg['avatar'] as String;
@@ -319,6 +326,25 @@ class PeonForgeProvider extends ChangeNotifier {
     _connection.send({'type': 'set-avatar', 'avatar': avatarId});
   }
   void petPeon() => _connection.send({'type': 'interact', 'action': 'pet'});
+
+  String? lastImageSavedPath;
+
+  Future<bool> uploadImage({ImageSource source = ImageSource.gallery}) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1920);
+      if (picked == null) return false;
+      final bytes = await picked.readAsBytes();
+      final base64Data = base64Encode(bytes);
+      final filename = picked.name;
+      _connection.send({'type': 'upload-image', 'data': base64Data, 'filename': filename});
+      debugPrint('[PeonForge] Image uploaded: ${bytes.length} bytes');
+      return true;
+    } catch (e) {
+      debugPrint('[PeonForge] uploadImage error: $e');
+      return false;
+    }
+  }
   void setSessionCharacter(String sessionId, String characterId) => _connection.send({
     'type': 'set-session-character', 'sessionId': sessionId, 'characterId': characterId,
   });

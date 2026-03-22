@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/peonforge_provider.dart';
@@ -190,6 +191,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
 
 
+          // Image upload buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _imageButton(
+                    icon: Icons.camera_alt,
+                    label: 'Photo',
+                    onTap: () => _uploadImage(p, ImageSource.camera),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _imageButton(
+                    icon: Icons.photo_library,
+                    label: 'Galerie',
+                    onTap: () => _uploadImage(p, ImageSource.gallery),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Active sessions
           if (p.sessions.isNotEmpty) ...[
             _sectionTitle('Sessions actives (${p.sessions.length})'),
@@ -264,6 +289,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       );
     });
+  }
+
+  void _uploadImage(PeonForgeProvider p, ImageSource source) async {
+    final sent = await p.uploadImage(source: source);
+    if (sent && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Image envoyee ! Chemin copie sur le PC'),
+          backgroundColor: WC3Colors.bgCard,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Widget _imageButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: WC3Colors.bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: WC3Colors.goldDark.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: WC3Colors.blue, size: 18),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(color: WC3Colors.goldText, fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStepCounter(PeonForgeProvider p, TamagotchiState tama) {
