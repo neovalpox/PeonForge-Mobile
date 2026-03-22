@@ -174,13 +174,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
             child: _frameData != null
                 ? InteractiveViewer(
                     minScale: 0.5,
-                    maxScale: 8.0,
-                    child: Center(
-                      child: Image.memory(
-                        _frameData!,
-                        gaplessPlayback: true,
-                        fit: BoxFit.contain,
-                      ),
+                    maxScale: 10.0,
+                    child: Image.memory(
+                      _frameData!,
+                      gaplessPlayback: true,
+                      fit: BoxFit.fitWidth,
+                      width: double.infinity,
                     ),
                   )
                 : const Center(
