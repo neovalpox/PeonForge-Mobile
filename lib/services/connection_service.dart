@@ -129,11 +129,47 @@ class ConnectionService {
       return;
     }
 
-    // Both failed — reset and try LAN again
+    // Both failed — try fetching latest tunnel URL from peonforge.ch
     _tryingTunnel = false;
-    _log('Reconnecting in 3s...');
+    _log('Both failed, fetching tunnel from server in 5s...');
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), _doConnect);
+    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+      await _fetchTunnelFromForge();
+      _doConnect();
+    });
+  }
+
+  String? _forgeToken;
+  void setForgeToken(String? token) { _forgeToken = token; }
+
+  Future<void> _fetchTunnelFromForge() async {
+    if (_forgeToken == null || _forgeToken!.isEmpty) return;
+    try {
+      _log('Fetching tunnel URL from peonforge.ch...');
+      final url = Uri.parse('https://peonforge.ch/api/connect?auth=$_forgeToken');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(url);
+      final res = await req.close().timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final body = await res.transform(const SystemEncoding().decoder).join();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        if (data['online'] == true && data['tunnel_url'] != null && (data['tunnel_url'] as String).isNotEmpty) {
+          final newTunnel = (data['tunnel_url'] as String)
+              .replaceFirst('https://', 'wss://')
+              .replaceFirst('http://', 'ws://');
+          _tunnelUrl = newTunnel;
+          _tryingTunnel = true;
+          _log('Got tunnel from server: $newTunnel');
+        }
+        if (data['lan_ip'] != null && (data['lan_ip'] as String).isNotEmpty) {
+          _lanUrl = 'ws://${data['lan_ip']}:${data['lan_port'] ?? 7777}';
+          _log('Got LAN from server: $_lanUrl');
+        }
+      }
+      client.close(force: true);
+    } catch (e) {
+      _log('Forge fetch failed: $e');
+    }
   }
 
   void _cleanup() {

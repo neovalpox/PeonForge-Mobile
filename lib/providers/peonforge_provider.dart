@@ -110,6 +110,9 @@ class PeonForgeProvider extends ChangeNotifier {
     final savedTunnel = prefs.getString('tunnel_url');
     final savedPort = prefs.getInt('server_port') ?? 7777;
     authToken = prefs.getString('auth_token');
+    // Load forge token for remote reconnect
+    final savedForge = prefs.getString('forge_token');
+    if (savedForge != null) _connection.setForgeToken(savedForge);
 
     if (savedIp != null && savedIp.isNotEmpty) {
       serverIp = savedIp;
@@ -184,6 +187,11 @@ class PeonForgeProvider extends ChangeNotifier {
       }
       if (msg['username'] != null) username = msg['username'] as String;
       if (msg['avatar'] != null) avatar = msg['avatar'] as String;
+      // Save forge token for remote reconnect via peonforge.ch
+      if (msg['forgeToken'] != null) {
+        _connection.setForgeToken(msg['forgeToken'] as String);
+        _saveForgeToken(msg['forgeToken'] as String);
+      }
       // Parse achievements
       if (msg['achievements'] != null) {
         achievements = (msg['achievements'] as List).map((a) => Achievement.fromJson(a)).toList();
@@ -335,6 +343,11 @@ class PeonForgeProvider extends ChangeNotifier {
   Future<void> _saveTunnelUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('tunnel_url', url);
+  }
+
+  Future<void> _saveForgeToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('forge_token', token);
   }
 
   Future<void> _saveLanIp(String ip) async {
