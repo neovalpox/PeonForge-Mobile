@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'theme/wc3_theme.dart';
 import 'i18n.dart';
@@ -129,6 +130,45 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _globalProvider = provider;
     provider.onTaskComplete = _onTaskComplete;
     provider.onPermissionRequest = _onPermissionRequest;
+    _checkForUpdate();
+  }
+
+  static const _currentVersion = '1.0.0';
+
+  Future<void> _checkForUpdate() async {
+    try {
+      await Future.delayed(const Duration(seconds: 5)); // wait for app to settle
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(Uri.parse('https://peonforge.ch/version.json'));
+      final res = await req.close().timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final body = await res.transform(const Utf8Decoder()).join();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        final remoteVersion = data['version'] as String? ?? _currentVersion;
+        if (remoteVersion != _currentVersion && mounted) {
+          final apkUrl = data['apk_url'] as String? ?? 'https://peonforge.ch/PeonForge.apk';
+          final changelog = data['changelog'] as String? ?? 'Mise a jour disponible';
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF16120A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF8B6914))),
+              title: const Text('Mise a jour disponible', style: TextStyle(color: Color(0xFFDFBD5E), fontSize: 16)),
+              content: Text('Version $remoteVersion\n\n$changelog', style: const TextStyle(color: Color(0xFFC8B88A), fontSize: 13)),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Plus tard', style: TextStyle(color: Color(0xFF5A5040)))),
+                ElevatedButton(
+                  onPressed: () { Navigator.pop(ctx); launchUrl(Uri.parse(apkUrl), mode: LaunchMode.externalApplication); },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B6914)),
+                  child: const Text('Telecharger', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+      client.close(force: true);
+    } catch (_) {}
   }
 
   @override
