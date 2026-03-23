@@ -133,7 +133,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _checkForUpdate();
   }
 
-  static const _currentVersion = '1.0.0';
+  static const _currentVersion = '2.0.0';
 
   Future<void> _checkForUpdate() async {
     try {
