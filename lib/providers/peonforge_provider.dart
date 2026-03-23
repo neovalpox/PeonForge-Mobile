@@ -424,6 +424,7 @@ class PeonForgeProvider extends ChangeNotifier {
   String? lastRegisterError;
 
   void setUsername(String name) => _connection.send({'type': 'set-username', 'username': name});
+  void setPassword(String pwd) => _connection.send({'type': 'set-password', 'password': pwd});
   void setAvatar(String avatarId) {
     avatar = avatarId;
     notifyListeners();

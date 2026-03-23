@@ -132,6 +132,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
+          // Password
+          _sectionTitle('Mot de passe'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GoldCard(
+              margin: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: GestureDetector(
+                onTap: () => _showPasswordDialog(p),
+                child: Row(
+                  children: [
+                    const Icon(Icons.lock, color: WC3Colors.goldDark, size: 18),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('Definir ou changer', style: TextStyle(color: WC3Colors.goldLight, fontSize: 13))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: WC3Colors.goldDark.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: WC3Colors.goldDark.withValues(alpha: 0.3))),
+                      child: const Text('Modifier', style: TextStyle(color: WC3Colors.goldLight, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // Characters
           _sectionTitle('Personnages'),
           Padding(
@@ -267,6 +292,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (name.length >= 2) {
                 p.setUsername(name);
                 Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Valider', style: TextStyle(color: WC3Colors.goldLight, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPasswordDialog(PeonForgeProvider p) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WC3Colors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: WC3Colors.goldDark)),
+        title: const Text('Mot de passe', style: TextStyle(color: WC3Colors.goldLight, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          style: const TextStyle(color: WC3Colors.goldLight),
+          decoration: const InputDecoration(
+            hintText: 'Nouveau mot de passe (min 4 car.)',
+            hintStyle: TextStyle(color: WC3Colors.textDim),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: WC3Colors.goldDark)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: WC3Colors.goldLight)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler', style: TextStyle(color: WC3Colors.textDim))),
+          TextButton(
+            onPressed: () {
+              final pwd = controller.text;
+              if (pwd.length >= 4) {
+                p.setPassword(pwd);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Mot de passe mis a jour !'), backgroundColor: WC3Colors.bgCard),
+                );
               }
             },
             child: const Text('Valider', style: TextStyle(color: WC3Colors.goldLight, fontWeight: FontWeight.w700)),
