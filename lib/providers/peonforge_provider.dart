@@ -7,6 +7,7 @@ import 'package:home_widget/home_widget.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import '../models/saved_pc.dart';
 import '../services/connection_service.dart';
 
 class PeonForgeProvider extends ChangeNotifier {
@@ -38,6 +39,9 @@ class PeonForgeProvider extends ChangeNotifier {
   List<Guild> guilds = [];
   Guild? myGuild;
   bool loadingGuilds = false;
+
+  List<SavedPC> savedPCs = [];
+  String? activePcId;
 
   Function(AppEvent)? onTaskComplete;
   Function(AppEvent)? onPermissionRequest;
@@ -107,49 +111,137 @@ class PeonForgeProvider extends ChangeNotifier {
 
   Future<void> _loadSaved() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedIp = prefs.getString('server_ip');
-    final savedTunnel = prefs.getString('tunnel_url');
-    final savedPort = prefs.getInt('server_port') ?? 7777;
-    authToken = prefs.getString('auth_token');
-    // Load forge token for remote reconnect
-    final savedForge = prefs.getString('forge_token');
-    if (savedForge != null) _connection.setForgeToken(savedForge);
 
-    if (savedIp != null && savedIp.isNotEmpty) {
-      serverIp = savedIp;
-      tunnelUrl = savedTunnel;
-      port = savedPort;
-      _connection.connect(savedIp, port: savedPort, tunnelFallback: savedTunnel, authToken: authToken);
-      notifyListeners();
-    } else if (savedTunnel != null && savedTunnel.isNotEmpty) {
-      tunnelUrl = savedTunnel;
-      port = savedPort;
-      _connection.connect(savedTunnel, isTunnel: true, port: savedPort, authToken: authToken);
-      notifyListeners();
+    // Load saved PCs list
+    final pcsJson = prefs.getString('saved_pcs');
+    if (pcsJson != null) {
+      try {
+        final list = jsonDecode(pcsJson) as List;
+        savedPCs = list.map((e) => SavedPC.fromJson(e as Map<String, dynamic>)).toList();
+        // Sort by most recently connected
+        savedPCs.sort((a, b) => b.lastConnected.compareTo(a.lastConnected));
+      } catch (_) {
+        savedPCs = [];
+      }
+    }
+
+    // Migrate legacy single-PC prefs to saved_pcs list
+    if (savedPCs.isEmpty) {
+      final savedIp = prefs.getString('server_ip');
+      final savedTunnel = prefs.getString('tunnel_url');
+      final savedPort = prefs.getInt('server_port') ?? 7777;
+      final savedAuth = prefs.getString('auth_token');
+      final savedForge = prefs.getString('forge_token');
+      if ((savedIp != null && savedIp.isNotEmpty) || (savedTunnel != null && savedTunnel.isNotEmpty)) {
+        final pc = SavedPC(
+          id: savedAuth ?? savedIp ?? savedTunnel ?? 'legacy',
+          lanIp: savedIp,
+          tunnelUrl: savedTunnel,
+          port: savedPort,
+          authToken: savedAuth,
+          forgeToken: savedForge,
+          lastConnected: DateTime.now().millisecondsSinceEpoch,
+        );
+        savedPCs.add(pc);
+        await _persistPCs();
+      }
+    }
+
+    // Auto-connect to most recently used PC
+    if (savedPCs.isNotEmpty) {
+      final pc = savedPCs.first;
+      _connectToSavedPC(pc);
+    }
+
+    notifyListeners();
+  }
+
+  void _connectToSavedPC(SavedPC pc) {
+    serverIp = pc.lanIp;
+    tunnelUrl = pc.tunnelUrl;
+    port = pc.port;
+    authToken = pc.authToken;
+    activePcId = pc.id;
+    if (pc.forgeToken != null) _connection.setForgeToken(pc.forgeToken!);
+
+    if (pc.lanIp != null && pc.lanIp!.isNotEmpty) {
+      _connection.connect(pc.lanIp!, port: pc.port, tunnelFallback: pc.tunnelUrl, authToken: pc.authToken);
+    } else if (pc.tunnelUrl != null && pc.tunnelUrl!.isNotEmpty) {
+      _connection.connect(pc.tunnelUrl!, isTunnel: true, port: pc.port, authToken: pc.authToken);
     }
   }
 
-  void connectTo(String address, {bool isTunnel = false, String? tunnelFallback, int port = 7777, String? authToken}) async {
+  /// Connect to a previously saved PC
+  void connectToPC(SavedPC pc) {
+    // Update last connected
+    pc.lastConnected = DateTime.now().millisecondsSinceEpoch;
+    _persistPCs();
+    _connectToSavedPC(pc);
+    notifyListeners();
+  }
+
+  /// Delete a saved PC from the list
+  Future<void> deletePC(String pcId) async {
+    savedPCs.removeWhere((pc) => pc.id == pcId);
+    await _persistPCs();
+    // If we deleted the active PC, disconnect
+    if (activePcId == pcId) {
+      disconnect();
+    }
+    notifyListeners();
+  }
+
+  /// Get the currently active SavedPC
+  SavedPC? get activePC => savedPCs.where((pc) => pc.id == activePcId).firstOrNull;
+
+  /// Save/update a PC in the list and persist
+  Future<void> _savePC(SavedPC pc) async {
+    final idx = savedPCs.indexWhere((p) => p.id == pc.id);
+    if (idx >= 0) {
+      savedPCs[idx] = pc;
+    } else {
+      savedPCs.insert(0, pc);
+    }
+    await _persistPCs();
+  }
+
+  Future<void> _persistPCs() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_pcs', jsonEncode(savedPCs.map((pc) => pc.toJson()).toList()));
+  }
+
+  void connectTo(String address, {bool isTunnel = false, String? tunnelFallback, int port = 7777, String? authToken}) async {
     this.port = port;
     if (authToken != null && authToken.isNotEmpty) {
       this.authToken = authToken;
-      await prefs.setString('auth_token', authToken);
     }
 
     if (isTunnel) {
       tunnelUrl = address;
-      await prefs.setString('tunnel_url', address);
-      await prefs.setInt('server_port', port);
+      serverIp = null;
       _connection.connect(address, isTunnel: true, port: port, authToken: this.authToken);
     } else {
       serverIp = address;
       tunnelUrl = tunnelFallback;
-      await prefs.setString('server_ip', address);
-      if (tunnelFallback != null) await prefs.setString('tunnel_url', tunnelFallback);
-      await prefs.setInt('server_port', port);
       _connection.connect(address, port: port, tunnelFallback: tunnelFallback, authToken: this.authToken);
     }
+
+    // Save/update this PC in the list
+    final pcId = this.authToken ?? address;
+    activePcId = pcId;
+    final pc = SavedPC(
+      id: pcId,
+      lanIp: isTunnel ? null : address,
+      tunnelUrl: isTunnel ? address : tunnelFallback,
+      port: port,
+      authToken: this.authToken,
+      lastConnected: DateTime.now().millisecondsSinceEpoch,
+    );
+    // Preserve existing name if we already have this PC
+    final existing = savedPCs.where((p) => p.id == pcId).firstOrNull;
+    if (existing != null) pc.name = existing.name;
+    await _savePC(pc);
+
     notifyListeners();
   }
 
@@ -166,9 +258,7 @@ class PeonForgeProvider extends ChangeNotifier {
     connected = false;
     serverIp = null;
     tunnelUrl = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('server_ip');
-    await prefs.remove('tunnel_url');
+    activePcId = null;
     notifyListeners();
   }
 
@@ -191,7 +281,6 @@ class PeonForgeProvider extends ChangeNotifier {
       // Save forge token for remote reconnect via peonforge.ch
       if (msg['forgeToken'] != null) {
         _connection.setForgeToken(msg['forgeToken'] as String);
-        _saveForgeToken(msg['forgeToken'] as String);
       }
       // Parse achievements
       if (msg['achievements'] != null) {
@@ -201,14 +290,27 @@ class PeonForgeProvider extends ChangeNotifier {
       if (msg['characters'] != null) {
         characters = (msg['characters'] as List).map((c) => GameCharacter.fromJson(c)).toList();
       }
+      // Update the active saved PC with hostname, tunnel, forge token
+      if (activePcId != null) {
+        final pc = savedPCs.where((p) => p.id == activePcId).firstOrNull;
+        if (pc != null) {
+          if (hostname.isNotEmpty) pc.name = hostname;
+          if (msg['forgeToken'] != null) pc.forgeToken = msg['forgeToken'] as String;
+          pc.lastConnected = DateTime.now().millisecondsSinceEpoch;
+          _persistPCs();
+        }
+      }
+
       // Save tunnel URL for internet access
       if (msg['tunnelUrl'] != null) {
         final tUrl = msg['tunnelUrl'] as String;
         if (tUrl.isNotEmpty) {
           tunnelUrl = tUrl.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
-          _saveTunnelUrl(tunnelUrl!);
           // Update connection to use tunnel as fallback
           _connection.updateTunnel(tunnelUrl!);
+          // Update saved PC
+          final pc = savedPCs.where((p) => p.id == activePcId).firstOrNull;
+          if (pc != null) { pc.tunnelUrl = tunnelUrl; _persistPCs(); }
         }
       }
       // Only save LAN IP if we already have one (connected via LAN initially)
@@ -217,7 +319,9 @@ class PeonForgeProvider extends ChangeNotifier {
         final lip = msg['lanIp'] as String;
         if (lip.isNotEmpty && serverIp != lip) {
           serverIp = lip;
-          _saveLanIp(lip);
+          // Update saved PC
+          final pc = savedPCs.where((p) => p.id == activePcId).firstOrNull;
+          if (pc != null) { pc.lanIp = lip; _persistPCs(); }
         }
       }
       notifyListeners();
@@ -366,20 +470,6 @@ class PeonForgeProvider extends ChangeNotifier {
 
   String? lastFocusDebug;
 
-  Future<void> _saveTunnelUrl(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('tunnel_url', url);
-  }
-
-  Future<void> _saveForgeToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('forge_token', token);
-  }
-
-  Future<void> _saveLanIp(String ip) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('server_ip', ip);
-  }
 
   void focusTerminal({String? sessionId, String? project}) {
     lastFocusDebug = 'WS connected=${_connection.isConnected}, IP=$serverIp:$port';

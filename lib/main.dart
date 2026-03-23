@@ -133,7 +133,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _checkForUpdate();
   }
 
-  static const _currentVersion = '2.0.0';
+  static const _currentVersion = '2.1.0';
 
   Future<void> _checkForUpdate() async {
     try {
@@ -347,8 +347,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final provider = context.watch<PeonForgeProvider>();
 
-    // Show connect screen if no server configured or if disconnected with no hope
-    if (provider.serverIp == null && provider.tunnelUrl == null) {
+    // Show connect screen if no active PC
+    if (provider.activePcId == null && provider.serverIp == null && provider.tunnelUrl == null) {
       return const ConnectScreen();
     }
 
@@ -364,7 +364,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               const SizedBox(height: 16),
               const Text('Connexion en cours...', style: TextStyle(color: WC3Colors.goldText, fontSize: 16)),
               const SizedBox(height: 8),
-              Text('${provider.serverIp ?? ""}', style: const TextStyle(color: WC3Colors.textDim, fontSize: 12)),
+              Text(provider.activePC?.displayName ?? provider.serverIp ?? '', style: const TextStyle(color: WC3Colors.textDim, fontSize: 12)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => provider.disconnect(),
@@ -386,7 +386,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           children: [
             _buildAppBarAvatar(provider),
             const SizedBox(width: 10),
-            Text('PeonForge', style: Theme.of(context).textTheme.titleMedium),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('PeonForge', style: Theme.of(context).textTheme.titleMedium),
+                if (provider.hostname.isNotEmpty)
+                  Text(provider.hostname, style: const TextStyle(color: WC3Colors.textDim, fontSize: 10)),
+              ],
+            ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
